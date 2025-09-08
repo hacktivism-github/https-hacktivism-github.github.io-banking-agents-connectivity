@@ -2,7 +2,7 @@
 
 Interactive web map to visualize mobile network coverage (Unitel & Africell, via nPerf tiles) and planned Banking Agent locations across Angola.
 
-Built with [Leaflet.js](https://leafletjs.com/), the tool allows toggling between operator coverage layers (4G / LTE) and overlaying CSV/KML files with agent coordinates.
+Built with [Leaflet.js](https://leafletjs.com/), the tool allows toggling between operator coverage layers (4G / LTE) and overlaying CSV files with agent coordinates.
 
 ## Features
 
