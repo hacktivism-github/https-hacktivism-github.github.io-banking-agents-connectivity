@@ -12,8 +12,6 @@ Built with [Leaflet.js](https://leafletjs.com/), the tool allows toggling betwee
 
 - Load CSV of Banking Agents (columns: latitude, longitude, nome).
 
-- Optional KML overlay with official or validated agent data.
-
 - Works entirely client-side — no server dependency, just open in browser.
 
 - Deployable via GitHub Pages for demos & reports.
