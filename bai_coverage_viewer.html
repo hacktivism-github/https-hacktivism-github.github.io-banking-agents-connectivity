@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
   <meta charset="utf-8" />
-  <title>BAI – Cobertura & Agentes</title>
+  <title>Mobile Operator's Coverage</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link
     rel="stylesheet"
@@ -55,11 +55,6 @@
     </div>
     <div style="color:#666; font-size:12px; margin-top:-2px;">
       Espera colunas como <em>latitude/longitude/nome</em> (auto-detecção: <em>lat, lon, name, displayName</em> etc.).
-    </div>
-
-    <div class="row" style="margin-top:10px;"><strong>KML (opcional)</strong></div>
-    <div class="row">
-      <input type="file" id="kmlFile" accept=".kml,.kmz" />
     </div>
   </div>
 
@@ -162,28 +157,6 @@
     // Clear points
     document.getElementById('clearPoints').addEventListener('click', () => {
       pointsLayer.clearLayers();
-    });
-
-    // Load KML (optional)
-    document.getElementById('kmlFile').addEventListener('change', evt => {
-      const file = evt.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const dom = new DOMParser().parseFromString(reader.result, 'text/xml');
-          const gj  = toGeoJSON.kml(dom);
-          if (kmlLayer) map.removeLayer(kmlLayer);
-          kmlLayer = L.geoJSON(gj, {
-            style: { color:'#d28b00', weight:2, opacity:0.9, fillOpacity:0.1 }
-          }).addTo(map);
-          if (kmlLayer.getLayers().length) map.fitBounds(kmlLayer.getBounds().pad(0.2));
-        } catch (e) {
-          console.error(e);
-          alert('Não foi possível ler o KML.');
-        }
-      };
-      reader.readAsText(file);
     });
 
     // Tip: serve via HTTP if browsers block .webp tiles by CORS
