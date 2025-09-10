@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <title>Mobile Operator's Coverage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- CSV helper -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .panel {
+      position: absolute; right: 10px; top: 10px; z-index: 1000;
+      background: #fff; padding: 10px; border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15); font: 13px/1.35 system-ui, sans-serif;
+      width: 340px; max-width: calc(100vw - 20px);
+    }
+    .panel h3 { margin: 0 0 6px; font-size: 14px; }
+    .row { margin: 6px 0; display: flex; align-items: center; gap: 8px; }
+    .row label { white-space: nowrap; }
+    .legend {
+      position: absolute; left: 10px; bottom: 10px; z-index: 800;
+      background: rgba(255,255,255,.9); padding: 8px 10px; border-radius: 6px;
+      font: 12px system-ui, sans-serif;
+    }
+    .sw { display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:6px; vertical-align:-2px; }
+    .sw.unitel { background:#6c3fd6; }
+    .sw.africell { background:#d94b4b; }
+    .btn { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background:#f6f6f6; cursor:pointer; }
+
+    .drop-hint {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:rgba(0,0,0,.65); color:#fff; padding:8px 12px; border-radius:6px; display:none;
+      pointer-events:none; z-index:1200; font:13px system-ui,sans-serif;
+    }
+    .status-dot {
+      width:9px; height:9px; border-radius:50%; display:inline-block; margin-left:6px;
+      background:#bbb; border:1px solid #888;
+    }
+    .ok { background:#1bb34f !important; border-color:#10883b !important; }
+    .err { background:#e04848 !important; border-color:#b93333 !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="drop-hint" id="dropHint">Largue um CSV (agentes) aqui…</div>
+
+  <div class="panel">
+    <h3>Camadas & Dados</h3>
+
+    <div class="row">
+      <label><input type="checkbox" id="chkUnitel"> Unitel 4G (nPerf)</label>
+      <span id="dotUnitel" class="status-dot" title="estado da camada"></span>
+      <label style="margin-left:12px;"><input type="checkbox" id="chkAfricell"> Africell 4G (nPerf)</label>
+      <span id="dotAfricell" class="status-dot" title="estado da camada"></span>
+    </div>
+
+    <div class="row">
+      <label style="min-width:80px;">Opacidade</label>
+      <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.6" style="flex:1;">
+      <button id="btnRefresh" class="btn" title="Forçar refresh dos tiles">↻</button>
+    </div>
+
+    <hr>
+
+    <div class="row"><strong>CSV de agentes</strong></div>
+    <div class="row">
+      <input type="file" id="csvFile" accept=".csv" />
+      <button class="btn" id="clearPoints">Limpar pontos</button>
+    </div>
+    <div style="color:#666; font-size:12px; margin-top:-2px;">
+      Espera colunas como <em>latitude/longitude/nome</em> (auto-detecção: <em>lat, lon, name, displayName</em> etc.).
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="sw unitel"></span>Unitel 4G (nPerf)</div>
+    <div><span class="sw africell"></span>Africell 4G (nPerf)</div>
+    <div style="margin-top:6px;color:#666;">• Pode arrastar CSV para o mapa</div>
+  </div>
+<script>
+  // --- Base Map ---
+  const map = L.map('map', { zoomControl: true }).setView([-11.5, 17], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // nPerf tile templates (live)
+  const URL_UNITEL_RAW   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
+  const URL_AFRICELL_RAW = "https://app.nperf.com/signal-2019555-{z}-{x}-{y}.webp";
+
+  // Minimal control to flip a proxy on/off (shows under your opacity slider)
+  const panel = document.querySelector('.panel');
+  const proxyRow = document.createElement('div');
+  proxyRow.className = 'row';
+  proxyRow.innerHTML = `
+    <label><input type="checkbox" id="useProxy"> Usar proxy (corrigir CORS)</label>
+  `;
+  panel.insertBefore(proxyRow, panel.querySelector('hr'));
+
+  const useProxyEl = document.getElementById('useProxy');
+
+  // A very simple public CORS proxy (free, best-effort)
+  function withProxy(url) {
+    if (!useProxyEl.checked) return url;
+    // corsproxy.io wants the full target URL appended after '?'
+    return `https://corsproxy.io/?${encodeURIComponent(url)}`;
+  }
+
+  function makeLayers() {
+    const opacity = parseFloat(document.getElementById('opacity').value || '0.6');
+    const unitel   = L.tileLayer(withProxy(URL_UNITEL_RAW),   { opacity, crossOrigin: true });
+    const africell = L.tileLayer(withProxy(URL_AFRICELL_RAW), { opacity, crossOrigin: true });
+    return { unitel, africell };
+  }
+
+  // Hold current layers so we can rebuild them if proxy toggle changes
+  let cov = makeLayers();
+  const chkUnitel   = document.getElementById('chkUnitel');
+  const chkAfricell = document.getElementById('chkAfricell');
+  const opacityCtrl = document.getElementById('opacity');
+
+  function attach(layer, checked) {
+    if (checked) map.addLayer(layer); else map.removeLayer(layer);
+  }
+
+  chkUnitel.addEventListener('change', () => attach(cov.unitel, chkUnitel.checked));
+  chkAfricell.addEventListener('change', () => attach(cov.africell, chkAfricell.checked));
+
+  opacityCtrl.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    cov.unitel.setOpacity(v);
+    cov.africell.setOpacity(v);
+  });
+
+  // If proxy setting changes, rebuild the layers keeping the toggles/opacities
+  useProxyEl.addEventListener('change', () => {
+    const wasU = map.hasLayer(cov.unitel);
+    const wasA = map.hasLayer(cov.africell);
+    const op   = parseFloat(opacityCtrl.value || '0.6');
+
+    // remove old
+    attach(cov.unitel, false);
+    attach(cov.africell, false);
+
+    cov = makeLayers();
+    cov.unitel.setOpacity(op);
+    cov.africell.setOpacity(op);
+
+    attach(cov.unitel, wasU);
+    attach(cov.africell, wasA);
+  });
+</script>
+
+</body>
+</html>
+
