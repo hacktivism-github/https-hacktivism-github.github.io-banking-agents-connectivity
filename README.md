@@ -6,7 +6,7 @@ Built with [Leaflet.js](https://leafletjs.com/), the tool allows toggling betwee
 
 ## Features
 
-- Toggle Unitel and Africell 3G,4G(LTE) and 5G coverage layers (nPerf).
+- Toggle Unitel and Africell 3G, 4G(LTE) and 5G coverage layers (nPerf).
 
 - Adjustable coverage opacity for easier visualization.
 
