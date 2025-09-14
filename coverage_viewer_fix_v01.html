@@ -122,159 +122,164 @@
     <div><span class="sw africell"></span>Africell 4G (nPerf)</div>
     <div style="margin-top:6px;color:#666;">• Pode arrastar CSV para o mapa</div>
   </div>
+<script>
+  // --- Base Map ---
+  const map = L.map('map', { zoomControl: true }).setView([-11.5, 17], 6);
+  const base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    zIndex: 100   // keep base below
+  }).addTo(map);
 
-  <script>
-    // --- Base Map ---
-    const map = L.map('map', { zoomControl: true }).setView([-11.5, 17], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+  // --- Coverage tile URLs ---
+  const URL_UNITEL   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
+  const URL_AFRICELL = "https://app.nperf.com/signal-2019555-{z}-{x}-{y}.webp";
 
-    // --- Coverage tile URLs ---
-    const URL_UNITEL   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
-    const URL_AFRICELL = "https://app.nperf.com/signal-2019555-{z}-{x}-{y}.webp";
-
-    // Datas (podes atualizar quando verificares no nPerf)
-    const LAST_UPDATE_UNITEL   = "09/07/2025 10:37 UTC";
-    const LAST_UPDATE_AFRICELL = "09/04/2025 18:53 UTC";
-
-    const initialOpacity = 0.6;
-    const lastUpdateEl = document.getElementById('lastUpdate');
-    function refreshLastUpdate() {
+  const LAST_UPDATE_UNITEL   = "09/07/2025 10:37 UTC";
+  const LAST_UPDATE_AFRICELL = "09/04/2025 18:53 UTC";
+  const lastUpdateEl = document.getElementById('lastUpdate');
+  function refreshLastUpdate() {
+    if (lastUpdateEl) {
       lastUpdateEl.textContent = `Last update — Unitel: ${LAST_UPDATE_UNITEL}, Africell: ${LAST_UPDATE_AFRICELL}`;
     }
-    refreshLastUpdate();
+  }
+  refreshLastUpdate();
 
-    /* === FIX: manter cobertura em zooms altos ===
-       nPerf costuma servir tiles até ~z11/12. Indicamos o zoom nativo máximo
-       e deixamos o Leaflet ampliar tiles acima disso.
-    */
-    const NPERF_MAX_NATIVE_ZOOM = 12; // ajusta para 11 se notares falhas em alguma área
+  // === Safe defaults for nPerf ===
+  const NPERF_MAX_NATIVE_ZOOM = 11;   // <= key change
+  const initialOpacity = 0.6;
 
-    function nperfLayer(url, zIndex) {
-      return L.tileLayer(url, {
-        opacity: initialOpacity,
-        maxNativeZoom: NPERF_MAX_NATIVE_ZOOM, // chave do quick-fix
-        maxZoom: 20,                           // permite zoom do mapa acima do nativo
-        updateWhenZooming: false,
-        updateInterval: 250,
-        keepBuffer: 4,
-        crossOrigin: true,
-        zIndex
-      });
+  function nperfLayer(url, zIndex) {
+    const layer = L.tileLayer(url, {
+      opacity: initialOpacity,
+      maxNativeZoom: NPERF_MAX_NATIVE_ZOOM,
+      maxZoom: 20,
+      updateWhenZooming: false,
+      updateInterval: 250,
+      keepBuffer: 4,
+      crossOrigin: true,
+      zIndex
+    });
+
+    // Fallback: if a hi-zoom tile fails, try parent tile (z-1)
+    layer.on('tileerror', (ev) => {
+      const src = ev.tile.getAttribute('src') || '';
+      const m = src.match(/-(\d+)-(\d+)-(\d+)\.webp$/);
+      if (!m) return;
+      let z = +m[1], x = +m[2], y = +m[3];
+      if (z <= NPERF_MAX_NATIVE_ZOOM) return; // already at/under native
+      const z2 = z - 1, x2 = Math.floor(x / 2), y2 = Math.floor(y / 2);
+      const fallback = src.replace(`-${z}-${x}-${y}.webp`, `-${z2}-${x2}-${y2}.webp`);
+      ev.tile.setAttribute('src', fallback);
+    });
+
+    // Debug: see loads in console
+    layer.on('tileload',  (e) => console.debug('[nPerf] tileload', e.tile.src));
+    layer.on('tileerror', (e) => console.warn('[nPerf] tileerror', e.tile.src));
+
+    return layer;
+  }
+
+  // Put nPerf above base map
+  const unitelLayer   = nperfLayer(URL_UNITEL,   400);
+  const africellLayer = nperfLayer(URL_AFRICELL, 401);
+
+  // === Turn Unitel ON by default so you immediately see coverage
+  const chkUnitel   = document.getElementById('chkUnitel');
+  const chkAfricell = document.getElementById('chkAfricell');
+  const opacityCtrl = document.getElementById('opacity');
+
+  if (chkUnitel)  { chkUnitel.checked = true;  map.addLayer(unitelLayer); }
+  if (chkAfricell){ chkAfricell.checked = false; }
+
+  chkUnitel.addEventListener('change', e => {
+    if (e.target.checked) map.addLayer(unitelLayer);
+    else map.removeLayer(unitelLayer);
+  });
+  chkAfricell.addEventListener('change', e => {
+    if (e.target.checked) map.addLayer(africellLayer);
+    else map.removeLayer(africellLayer);
+  });
+  opacityCtrl.addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    unitelLayer.setOpacity(v);
+    africellLayer.setOpacity(v);
+  });
+
+  // Keep tiles sharp when scaling past native zoom
+  map.on('zoomend', () => {
+    unitelLayer.redraw();
+    africellLayer.redraw();
+  });
+
+  // --- Clustered CSV points (unchanged) ---
+  const cluster = L.markerClusterGroup({ showCoverageOnHover:false, spiderfyOnMaxZoom:true });
+  map.addLayer(cluster);
+
+  function pickColumn(columns, candidates) {
+    const lc = columns.map(c => c.toLowerCase());
+    for (const cand of candidates) {
+      const i = lc.indexOf(cand.toLowerCase());
+      if (i !== -1) return columns[i];
     }
+    return null;
+  }
 
-    const unitelLayer   = nperfLayer(URL_UNITEL,   400);
-    const africellLayer = nperfLayer(URL_AFRICELL, 401);
+  function addCsvPoints(rows) {
+    cluster.clearLayers();
+    let count = 0;
 
-    // Fallback: se um tile a z alto falhar, tenta o tile do zoom imediatamente inferior
-    function addFallback(layer) {
-      layer.on('tileerror', (ev) => {
-        const src = ev.tile.getAttribute('src') || '';
-        const m = src.match(/-(\d+)-(\d+)-(\d+)\.webp$/);
-        if (!m) return;
-        let z = +m[1], x = +m[2], y = +m[3];
-        if (z <= NPERF_MAX_NATIVE_ZOOM) return; // já estamos no nativo
-        const z2 = z - 1;
-        const x2 = Math.floor(x / 2);
-        const y2 = Math.floor(y / 2);
-        const fallback = src.replace(`-${z}-${x}-${y}.webp`, `-${z2}-${x2}-${y2}.webp`);
-        ev.tile.setAttribute('src', fallback);
-      });
-    }
-    addFallback(unitelLayer);
-    addFallback(africellLayer);
+    const cols = Object.keys(rows[0] || {});
+    const latCol  = pickColumn(cols, ['latitude','lat']);
+    const lonCol  = pickColumn(cols, ['longitude','lon','lng']);
+    const nameCol = pickColumn(cols, ['nome','name','displayName','displayname','title']);
 
-    // --- UI: toggles + opacity ---
-    const chkUnitel   = document.getElementById('chkUnitel');
-    const chkAfricell = document.getElementById('chkAfricell');
-    const opacityCtrl = document.getElementById('opacity');
+    if (!latCol || !lonCol) { alert('Não encontrei colunas de latitude/longitude.'); return; }
 
-    chkUnitel.addEventListener('change', e => {
-      if (e.target.checked) map.addLayer(unitelLayer);
-      else map.removeLayer(unitelLayer);
-    });
-    chkAfricell.addEventListener('change', e => {
-      if (e.target.checked) map.addLayer(africellLayer);
-      else map.removeLayer(africellLayer);
-    });
-    opacityCtrl.addEventListener('input', e => {
-      const v = parseFloat(e.target.value);
-      unitelLayer.setOpacity(v);
-      africellLayer.setOpacity(v);
-    });
-
-    // --- Clustered CSV points ---
-    const cluster = L.markerClusterGroup({ showCoverageOnHover:false, spiderfyOnMaxZoom:true });
-    map.addLayer(cluster);
-
-    function pickColumn(columns, candidates) {
-      const lc = columns.map(c => c.toLowerCase());
-      for (const cand of candidates) {
-        const i = lc.indexOf(cand.toLowerCase());
-        if (i !== -1) return columns[i];
+    rows.forEach(r => {
+      const lat = parseFloat(String(r[latCol]).replace(',', '.'));
+      const lon = parseFloat(String(r[lonCol]).replace(',', '.'));
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        const title = nameCol ? String(r[nameCol]) : 'Agente';
+        const m = L.marker([lat, lon]).bindPopup(`<b>${title}</b><br>${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+        cluster.addLayer(m);
+        count++;
       }
-      return null;
-    }
-
-    function addCsvPoints(rows) {
-      cluster.clearLayers();
-      let count = 0;
-
-      const cols = Object.keys(rows[0] || {});
-      const latCol  = pickColumn(cols, ['latitude','lat']);
-      const lonCol  = pickColumn(cols, ['longitude','lon','lng']);
-      const nameCol = pickColumn(cols, ['nome','name','displayName','displayname','title']);
-
-      if (!latCol || !lonCol) { alert('Não encontrei colunas de latitude/longitude.'); return; }
-
-      rows.forEach(r => {
-        const lat = parseFloat(String(r[latCol]).replace(',', '.'));
-        const lon = parseFloat(String(r[lonCol]).replace(',', '.'));
-        if (Number.isFinite(lat) && Number.isFinite(lon)) {
-          const title = nameCol ? String(r[nameCol]) : 'Agente';
-          const m = L.marker([lat, lon]).bindPopup(`<b>${title}</b><br>${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-          cluster.addLayer(m);
-          count++;
-        }
-      });
-
-      if (count) map.fitBounds(cluster.getBounds().pad(0.2));
-    }
-
-    function loadCsvFile(file) {
-      Papa.parse(file, {
-        header: true, skipEmptyLines: true,
-        complete: (res) => {
-          const rows = res.data;
-          if (!rows.length) return alert('CSV vazio.');
-          addCsvPoints(rows);
-        }
-      });
-    }
-
-    document.getElementById('csvFile').addEventListener('change', e => {
-      const f = e.target.files[0]; if (f) loadCsvFile(f);
     });
 
-    document.getElementById('clearPoints').addEventListener('click', () => cluster.clearLayers());
+    if (count) map.fitBounds(cluster.getBounds().pad(0.2));
+  }
 
-    // --- Drag & Drop (CSV only) ---
-    const dropHint = document.getElementById('dropHint');
-    function showHint(show){ dropHint.style.display = show ? 'block' : 'none'; }
-    window.addEventListener('dragover', e => { e.preventDefault(); showHint(true); });
-    window.addEventListener('dragleave', e => { showHint(false); });
-    window.addEventListener('drop', e => {
-      e.preventDefault(); showHint(false);
-      const f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) || null;
-      if (!f) return;
-      const name = (f.name || '').toLowerCase();
-      if (name.endsWith('.csv')) return loadCsvFile(f);
-      alert('Formato não suportado aqui. Use CSV.');
+  function loadCsvFile(file) {
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: (res) => {
+        const rows = res.data;
+        if (!rows.length) return alert('CSV vazio.');
+        addCsvPoints(rows);
+      }
     });
+  }
 
-    // GH Pages: tiles .webp do nPerf carregam direto. Local: python3 -m http.server 8000
-  </script>
+  document.getElementById('csvFile').addEventListener('change', e => {
+    const f = e.target.files[0]; if (f) loadCsvFile(f);
+  });
+
+  document.getElementById('clearPoints').addEventListener('click', () => cluster.clearLayers());
+
+  const dropHint = document.getElementById('dropHint');
+  function showHint(show){ dropHint.style.display = show ? 'block' : 'none'; }
+  window.addEventListener('dragover', e => { e.preventDefault(); showHint(true); });
+  window.addEventListener('dragleave', e => { showHint(false); });
+  window.addEventListener('drop', e => {
+    e.preventDefault(); showHint(false);
+    const f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) || null;
+    if (!f) return;
+    const name = (f.name || '').toLowerCase();
+    if (name.endsWith('.csv')) return loadCsvFile(f);
+    alert('Formato não suportado aqui. Use CSV.');
+  });
+</script>
+
 </body>
 </html>
 
