@@ -146,10 +146,24 @@
     const LAST_UPDATE_AFRICELL = "09/04/2025 18:53 UTC";
 
     const initialOpacity = 0.6;
-    const unitelLayer   = L.tileLayer(URL_UNITEL,   { opacity: initialOpacity });
-    const africellLayer = L.tileLayer(URL_AFRICELL, { opacity: initialOpacity });
+//    const unitelLayer   = L.tileLayer(URL_UNITEL,   { opacity: initialOpacity });
+//    const africellLayer = L.tileLayer(URL_AFRICELL, { opacity: initialOpacity });
 
     // --- UI: toggles + opacity ---
+    // --- QUICK FIX: scale last available tiles ---
+    const unitelLayer = L.tileLayer(URL_UNITEL, {
+      opacity: initialOpacity,
+      maxNativeZoom: 9,   // adjust if needed (try 8–10 depending on what loads)
+      maxZoom: 18,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAQAAABx7n0/AAAAAElFTkSuQmCC'
+    });
+
+    const africellLayer = L.tileLayer(URL_AFRICELL, {
+      opacity: initialOpacity,
+      maxNativeZoom: 9,
+      maxZoom: 18,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAQAAABx7n0/AAAAAElFTkSuQmCC'
+    });
     const chkUnitel   = document.getElementById('chkUnitel');
     const chkAfricell = document.getElementById('chkAfricell');
     const opacityCtrl = document.getElementById('opacity');
