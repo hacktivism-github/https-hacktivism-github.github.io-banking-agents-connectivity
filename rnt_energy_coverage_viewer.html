@@ -382,10 +382,12 @@
     }
 
     // Helpers
-    function escapeHtml(s){
-      return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    }[c]));
-    }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"]/g, (c) => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]
+    ));
+  }
+
     function escapeAttr(s){
       return String(s).replace(/"/g, '&quot;');
     }
