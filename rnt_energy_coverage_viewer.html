@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RNT → OSM Digitizer (Aligned Overlay)</title>
+  <title>RNT → OSM Digitizer (Zones A–D) — Final</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
@@ -13,7 +13,7 @@
     #map { height: 100%; }
     .panel {
       position: absolute; right: 10px; top: 10px; z-index: 1000;
-      background: #fff; padding: 12px; border-radius: 10px; width: 400px;
+      background: #fff; padding: 12px; border-radius: 10px; width: 420px;
       box-shadow: 0 8px 30px rgba(2,8,20,.15); font: 13px/1.35 system-ui, sans-serif;
       max-height: calc(100vh - 20px); overflow: auto;
     }
@@ -26,6 +26,7 @@
     }
     .row .btn { padding: 8px 10px; border-radius: 8px; border: 1px solid #d0d5dd; cursor: pointer; background: #f8fafc; }
     .row .btn.primary { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border:1px solid #e5e7eb; }
     .legend {
       position: absolute; left: 10px; bottom: 10px; z-index: 1000; background: #fff;
       padding: 10px; border-radius: 10px; box-shadow: 0 8px 30px rgba(2,8,20,.15); font: 12px/1.35 system-ui, sans-serif;
@@ -33,6 +34,7 @@
     .legend .item { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
     .swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid #d0d5dd; }
     .hr { height: 1px; background: #eee; margin: 10px 0; }
+    .muted { opacity: .7; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -40,10 +42,14 @@
 
   <div class="panel">
     <h3>RNT → OSM Digitizer</h3>
-    <div class="row"><label>Overlay the RNT PNG (approximate georeference)</label></div>
+    <div class="muted">Digitize Angola's power infrastructure directly on OSM. Import/export GeoJSON; auto‑classify sites into Zones A–D.</div>
+
+    <div class="hr"></div>
+    <h4>Overlay (optional)</h4>
+    <div class="muted">Optional RNT PNG overlay for reference (approximate fit).</div>
     <div class="row"><label>PNG file</label><input id="pngFile" type="file" accept="image/png,image/jpeg" /></div>
     <div class="row"><label>…or Image URL (HTTPS)</label><input id="imgUrl" type="text" placeholder="https://your-server/rnt.png" /><button class="btn" id="btnLoadUrl">Load</button></div>
-    <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.55"/></div>
+    <div class="row"><label>Opacity</label><input id="opacity" type="range" min="0.2" max="1" step="0.05" value="0.45" /></div>
 
     <div class="hr"></div>
     <h4>Digitize features</h4>
@@ -54,6 +60,11 @@
     <h4>Data</h4>
     <div class="row"><button class="btn" id="btnExport">Export GeoJSON</button><button class="btn" id="btnClear">Clear</button></div>
     <div class="row"><label>Import GeoJSON</label><input id="geojsonFile" type="file" accept=".json,.geojson" /></div>
+    <div class="muted">Importer accepts <code>type</code> or <code>kind</code> for feature type (<code>substation</code> | <code>generation</code> | <code>transmission_line</code>).</div>
+
+    <div class="hr"></div>
+    <h4>Zone thresholds (reliability)</h4>
+    <div class="row">A ≥ <input id="thrA" type="number" min="0" max="100" value="80" style="width:60px"> &nbsp; B ≥ <input id="thrB" type="number" min="0" max="100" value="50" style="width:60px"> &nbsp; C ≥ <input id="thrC" type="number" min="0" max="100" value="20" style="width:60px"></div>
   </div>
 
   <div class="legend">
@@ -66,35 +77,166 @@
   </div>
 
   <script>
-    const map = L.map('map').setView([-11.2, 17.8], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    // --- Base map (OSM) ---
+    const map = L.map('map', { zoomControl:true }).setView([-11.2, 17.8], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
-    const overlayLayer = L.layerGroup().addTo(map);
+    // --- Layers ---
+    const overlayLayer = L.layerGroup().addTo(map); // PNG overlay holder
+    const sitesLayer = L.layerGroup().addTo(map);
+    const linesLayer = L.layerGroup().addTo(map);
+
+    // --- Optional overlay ---
     let imageLayer = null;
-
-    function loadOverlay(src) {
-      const bounds = [[-4.3, 11.6], [-18.1, 24.1]]; // Angola approx NW/SE
+    function loadOverlay(src){
+      const bounds = [[-4.3, 11.6], [-18.1, 24.1]]; // Angola approx
       if (imageLayer) overlayLayer.removeLayer(imageLayer);
-      imageLayer = L.imageOverlay(src, bounds, { opacity: +document.getElementById('opacity').value }).addTo(overlayLayer);
+      imageLayer = L.imageOverlay(src, bounds, { opacity: +document.getElementById('opacity').value, crossOrigin:true }).addTo(overlayLayer);
       map.fitBounds(bounds);
     }
+    document.getElementById('pngFile').addEventListener('change', ev=>{ const f=ev.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>loadOverlay(r.result); r.readAsDataURL(f); });
+    document.getElementById('btnLoadUrl').onclick = ()=>{ const u=document.getElementById('imgUrl').value.trim(); if(u) loadOverlay(u); };
+    document.getElementById('opacity').addEventListener('input', ()=>{ if(imageLayer) imageLayer.setOpacity(+document.getElementById('opacity').value); });
 
-    document.getElementById('pngFile').addEventListener('change', ev => {
-      const f = ev.target.files?.[0]; if (!f) return;
-      const r = new FileReader();
-      r.onload = () => loadOverlay(r.result);
-      r.readAsDataURL(f);
+    // --- State ---
+    let addMode = null; // 'sub' | 'gen'
+    const SITES = []; // {__id, lat, lng, name, type, energy_type, reliability, kv, mw, hours_per_day, status, notes}
+
+    // --- Visuals & classification ---
+    const ZCOL = { A:'#16a34a', B:'#3b82f6', C:'#f59e0b', D:'#ef4444' };
+    const thrA = document.getElementById('thrA');
+    const thrB = document.getElementById('thrB');
+    const thrC = document.getElementById('thrC');
+    function classify(rec){
+      const rel = Number(rec.reliability||0);
+      const t = (rec.energy_type||'').toLowerCase();
+      const A=+thrA.value, B=+thrB.value, C=+thrC.value;
+      if ((t==='grid'||t==='mini-grid') && rel>=A) return 'A';
+      if ((t==='grid'||t==='mini-grid') && rel>=B) return 'B';
+      if (t==='generator'||t==='solar' || rel>=C) return 'C';
+      return 'D';
+    }
+    function siteIcon(color){ return L.divIcon({className:'', html:`<div style="width:14px;height:14px;border-radius:50%;border:2px solid #111;background:${color}"></div>`, iconSize:[18,18], iconAnchor:[9,9]}); }
+
+    function popupHtml(rec){
+      const zone = classify(rec);
+      return `<div style="min-width:240px">
+        <div style="font-weight:700;margin-bottom:4px">${escapeHtml(rec.name||'Unnamed')}</div>
+        <div><span class="pill">Zone ${zone}</span> • <strong>${escapeHtml(rec.type||'?')}</strong> • <em>${escapeHtml(rec.energy_type||'?')}</em></div>
+        ${rec.mw?`<div>Capacity: <strong>${rec.mw} MW</strong></div>`:''}
+        ${rec.kv?`<div>Voltage: <strong>${rec.kv} kV</strong></div>`:''}
+        <div>Reliability: <strong>${rec.reliability??'?'}%</strong></div>
+        ${rec.hours_per_day?`<div>Hours/day: <strong>${rec.hours_per_day}</strong></div>`:''}
+        ${rec.status?`<div>Status: <strong>${escapeHtml(rec.status)}</strong></div>`:''}
+        ${rec.notes?`<div style="margin-top:4px;white-space:pre-wrap">${escapeHtml(rec.notes)}</div>`:''}
+        <div class="hr"></div>
+        <button onclick="window.__editSite('${rec.__id}')">Edit</button>
+        <button style="margin-left:6px" onclick="window.__delSite('${rec.__id}')">Delete</button>
+      </div>`;
+    }
+
+    function redrawSites(){
+      sitesLayer.clearLayers();
+      SITES.forEach(rec=>{
+        const zone = classify(rec);
+        L.marker([rec.lat, rec.lng], { icon: siteIcon(ZCOL[zone]) })
+          .bindPopup(popupHtml(rec)).addTo(sitesLayer);
+      });
+    }
+
+    function openSiteEditor(rec){
+      const html = document.createElement('div');
+      html.innerHTML = `
+        <div style="display:grid; grid-template-columns:1fr; gap:6px; width:260px">
+          <label>Name<input id="f_name" value="${escapeAttr(rec.name||'')}"/></label>
+          <label>Type<select id="f_type"><option ${rec.type==='substation'?'selected':''}>substation</option><option ${rec.type==='generation'?'selected':''}>generation</option></select></label>
+          <label>Energy type<select id="f_et">${['grid','mini-grid','generator','solar','none'].map(v=>`<option ${rec.energy_type===v?'selected':''}>${v}</option>`).join('')}</select></label>
+          <label>Reliability (0–100)<input id="f_rel" type="number" min="0" max="100" value="${Number(rec.reliability||0)}"/></label>
+          <label>Capacity MW (optional)<input id="f_mw" type="number" step="1" value="${rec.mw||''}"/></label>
+          <label>Voltage kV (optional)<input id="f_kv" type="number" step="1" value="${rec.kv||''}"/></label>
+          <label>Hours per day (optional)<input id="f_hpd" type="number" min="0" max="24" value="${rec.hours_per_day||''}"/></label>
+          <label>Status<input id="f_status" value="${escapeAttr(rec.status||'')}"/></label>
+          <label>Notes<textarea id="f_notes">${escapeHtml(rec.notes||'')}</textarea></label>
+          <div style="display:flex; gap:8px; margin-top:6px"><button id="save" class="btn primary">Save</button><button id="cancel" class="btn">Cancel</button></div>
+        </div>`;
+      const pop = L.popup().setLatLng([rec.lat, rec.lng]).setContent(html).openOn(map);
+      html.querySelector('#save').onclick = ()=>{
+        rec.name = html.querySelector('#f_name').value.trim();
+        rec.type = html.querySelector('#f_type').value;
+        rec.energy_type = html.querySelector('#f_et').value;
+        rec.reliability = Number(html.querySelector('#f_rel').value);
+        rec.mw = Number(html.querySelector('#f_mw').value)||'';
+        rec.kv = Number(html.querySelector('#f_kv').value)||'';
+        rec.hours_per_day = html.querySelector('#f_hpd').value;
+        rec.status = html.querySelector('#f_status').value;
+        rec.notes = html.querySelector('#f_notes').value;
+        redrawSites(); map.closePopup(pop);
+      };
+      html.querySelector('#cancel').onclick = ()=> map.closePopup(pop);
+    }
+
+    window.__editSite = (id)=>{ const rec=SITES.find(s=>s.__id===id); if(rec) openSiteEditor(rec); };
+    window.__delSite = (id)=>{ const i=SITES.findIndex(s=>s.__id===id); if(i>=0){ SITES.splice(i,1); redrawSites(); } };
+
+    map.on('click', (e)=>{
+      if (!addMode) return;
+      const t = addMode==='sub' ? 'substation' : 'generation';
+      const rec = { __id:crypto.randomUUID(), lat:e.latlng.lat, lng:e.latlng.lng, name:'', type:t, energy_type: t==='substation'?'grid':'generator', reliability: t==='substation'?80:50 };
+      SITES.push(rec); openSiteEditor(rec);
     });
-    document.getElementById('btnLoadUrl').onclick = () => {
-      const u = document.getElementById('imgUrl').value.trim();
-      if (u) loadOverlay(u);
+
+    document.getElementById('btnAddSub').onclick = ()=>{ addMode = addMode==='sub'? null : 'sub'; toggleBtn('btnAddSub', addMode==='sub'); };
+    document.getElementById('btnAddGen').onclick = ()=>{ addMode = addMode==='gen'? null : 'gen'; toggleBtn('btnAddGen', addMode==='gen'); };
+    function toggleBtn(id, on){ document.getElementById(id).classList.toggle('primary', on); }
+
+    // --- Transmission lines (Leaflet.draw) ---
+    let currentDraw = null;
+    const drawOptions = { polyline: { shapeOptions: { color:'#111827', weight:3, opacity:0.9 } }, polygon:false, rectangle:false, circle:false, circlemarker:false, marker:false };
+    document.getElementById('btnDrawLine').onclick = ()=>{ if (currentDraw) currentDraw.disable(); currentDraw = new L.Draw.Polyline(map, drawOptions.polyline); currentDraw.enable(); };
+    document.getElementById('btnStopDraw').onclick = ()=>{ if (currentDraw) currentDraw.disable(); currentDraw=null; };
+    map.on(L.Draw.Event.CREATED, (e)=>{ if (e.layerType==='polyline'){ linesLayer.addLayer(e.layer); } });
+
+    // --- Import / Export GeoJSON ---
+    document.getElementById('btnExport').onclick = ()=>{
+      const fc = { type:'FeatureCollection', features: [] };
+      SITES.forEach(s=>{
+        fc.features.push({ type:'Feature', geometry:{ type:'Point', coordinates:[s.lng, s.lat] }, properties:{ name:s.name, type:s.type, energy_type:s.energy_type, reliability:s.reliability, mw:s.mw, kv:s.kv, hours_per_day:s.hours_per_day, status:s.status, notes:s.notes, zone: classify(s) } });
+      });
+      linesLayer.eachLayer(l=>{
+        const coords = l.getLatLngs().map(ll=>[ll.lng, ll.lat]);
+        fc.features.push({ type:'Feature', geometry:{ type:'LineString', coordinates: coords }, properties:{ type:'transmission_line' } });
+      });
+      downloadText('rnt_osm_digitized.geojson', JSON.stringify(fc, null, 2));
     };
-    document.getElementById('opacity').addEventListener('input', () => {
-      if (imageLayer) imageLayer.setOpacity(+document.getElementById('opacity').value);
+
+    document.getElementById('geojsonFile').addEventListener('change', async (ev)=>{
+      const f = ev.target.files?.[0]; if(!f) return; const text = await f.text();
+      try { const gj = JSON.parse(text); loadGeoJSON(gj); } catch(err){ alert('Invalid GeoJSON'); console.error(err); }
     });
+
+    function loadGeoJSON(gj){
+      try{
+        SITES.length = 0; sitesLayer.clearLayers(); linesLayer.clearLayers();
+        const feats = gj.type==='FeatureCollection' ? (gj.features||[]) : Array.isArray(gj) ? gj : [];
+        feats.forEach(ft=>{
+          const g = ft.geometry||{}; const p = ft.properties||{}; const kind = (p.type || p.kind || '').toLowerCase();
+          if (g.type==='Point'){
+            const [lng, lat] = g.coordinates; if (typeof lat!=='number'||typeof lng!=='number') return;
+            const rec = { __id:crypto.randomUUID(), lat, lng, name: p.name||'', type: (kind==='plant'?'generation': (kind||'substation')), energy_type: p.energy_type|| (kind==='generation'?'generator':'grid'), reliability: Number(p.reliability||0), mw: p.mw||'', kv: p.kv||'', hours_per_day: p.hours_per_day||'', status: p.status||'', notes: p.notes||'' };
+            SITES.push(rec);
+          } else if (g.type==='LineString'){
+            const latlngs = (g.coordinates||[]).map(([lng,lat])=>L.latLng(lat,lng));
+            L.polyline(latlngs, drawOptions.polyline.shapeOptions).addTo(linesLayer);
+          }
+        });
+        redrawSites();
+      } catch(e){ console.error('loadGeoJSON failed', e); alert('Failed to load GeoJSON (see console).'); }
+    }
+
+    // --- Helpers ---
+    function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+    function downloadText(filename, text){ const blob=new Blob([text],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000); }
   </script>
 </body>
 </html>
