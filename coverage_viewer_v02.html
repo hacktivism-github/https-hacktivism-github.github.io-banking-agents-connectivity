@@ -12,13 +12,14 @@
   <!-- MarkerCluster -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <link rel="stylesheet" href="assets/css/coverage_viewer_v02.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <!-- CSV helper -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <script src="assets/js/coverage_viewer_v02.js"></script>
+  <!-- App CSS/JS -->
+  <link rel="stylesheet" href="assets/css/coverage_viewer.css" />
+  <script defer src="assets/js/coverage_viewer.js"></script>
 </head>
 <body>
   <div id="map"></div>
@@ -61,17 +62,22 @@
 
     <hr>
 
-    <div class="row">
+    <div class="row" style="gap:6px; flex-wrap:wrap">
       <button class="btn" id="classifyBtn">Classificar Zonas (A–D)</button>
       <button class="btn" id="exportCsvBtn">Exportar CSV</button>
       <button class="btn" id="exportGeojsonBtn">Exportar GeoJSON</button>
     </div>
+
+    <div class="row">
+      <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
+    </div>
+
     <div style="color:#666; font-size:12px;">
-      Se não houver coluna de cobertura no CSV, a classificação usa apenas a energia (resultado provisório).
+      Se não houver coluna de cobertura no CSV, a classificação usa apenas a energia (resultado provisório → marca <b>B*</b>).
     </div>
   </div>
 
-  <!-- Barra tipo nPerf -->
+  <!-- Barra estilo nPerf -->
   <div class="nperf-bar" id="nperfBar">
     <div class="badge" id="lastUpdate">Last update — Unitel: –, Africell: –</div>
     <div class="techs">
@@ -83,21 +89,19 @@
     </div>
   </div>
 
+  <!-- Legendas -->
   <div class="legend">
     <div><span class="sw unitel"></span>Unitel 4G (nPerf)</div>
     <div><span class="sw africell"></span>Africell 4G (nPerf)</div>
     <div style="margin-top:6px;color:#666;">• Pode arrastar CSV para o mapa</div>
   </div>
-  <div class="row">
-  <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
-</div>
-<div class="legend legend-zones" style="margin-top:8px">
-  <div><span class="sw zoneA"></span>Zona A — energia estável + 4G/5G</div>
-  <div><span class="sw zoneB"></span>Zona B — energia estável/instável + 2G/3G/4G</div>
-  <div><span class="sw zoneC"></span>Zona C — off-grid (LEO/VSAT + solar)</div>
-  <div><span class="sw zoneD"></span>Zona D — comunitária/mesh</div>
-  <div style="color:#666;margin-top:4px">B* = provisório (cobertura por confirmar)</div>
-</div>
 
+  <div class="legend legend-zones">
+    <div><span class="sw zoneA"></span>Zona A — energia estável + 4G/5G</div>
+    <div><span class="sw zoneB"></span>Zona B — energia estável/instável + 2G/3G/4G</div>
+    <div><span class="sw zoneC"></span>Zona C — off-grid (LEO/VSAT + solar)</div>
+    <div><span class="sw zoneD"></span>Zona D — comunitária/mesh</div>
+    <div style="color:#666;margin-top:4px">B* = provisório (cobertura por confirmar)</div>
+  </div>
 </body>
 </html>
