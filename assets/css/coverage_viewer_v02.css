@@ -92,6 +92,12 @@ html, body { height: 100%; margin: 0; }
 .marker-cluster.mc-md  { border: 2px solid rgba(0,0,0,.25); }
 .marker-cluster.mc-lg  { border: 2px solid rgba(0,0,0,.30); }
 
+/* Tamanhos do “círculo” do cluster */
+.marker-cluster.mc-sm  div { width: 32px; height: 32px; line-height: 32px; }
+.marker-cluster.mc-md  div { width: 40px; height: 40px; line-height: 40px; }
+.marker-cluster.mc-lg  div { width: 48px; height: 48px; line-height: 48px; }
+
+
 .marker-cluster.zone-a div { background:#2ecc71; }        /* A */
 .marker-cluster.zone-b div { background:#f1c40f; color:#333; } /* B (melhor contraste) */
 .marker-cluster.zone-c div { background:#e74c3c; }        /* C */
