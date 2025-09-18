@@ -1,6 +1,6 @@
 // assets/js/coverage_viewer.js
 document.addEventListener("DOMContentLoaded", () => {
-  // -------------------- MAPA BASE (com fallback) --------------------
+  // ===== MAPA BASE + FALLBACK =====
   const map = L.map("map", { zoomControl: true }).setView([-11.5, 17], 6);
 
   const osmStd = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -33,11 +33,11 @@ document.addEventListener("DOMContentLoaded", () => {
   ).addTo(map);
   setTimeout(() => map.invalidateSize(), 0);
 
-  // Pane dedicado à energia (acima dos tiles, abaixo dos marcadores)
+  // Pane para energia (acima dos tiles)
   map.createPane("energyPane");
-  map.getPane("energyPane").style.zIndex = 350;
+  map.getPane("energyPane").style.zIndex = 450;
 
-  // -------------------- HELPERS --------------------
+  // ===== HELPERS =====
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return (rank[A] >= rank[B]) ? A : B;
   }
 
-  // -------------------- nPerf (tiles) --------------------
+  // ===== nPerf (tiles) =====
   const URL_UNITEL   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
   const URL_AFRICELL = "https://app.nperf.com/signal-2019555-{z}-{x}-{y}.webp";
   const LAST_UPDATE_UNITEL   = "09/07/2025 10:37 UTC";
@@ -98,203 +98,101 @@ document.addEventListener("DOMContentLoaded", () => {
     unitelLayer.setOpacity(v); africellLayer.setOpacity(v);
   });
 
-  // -------------------- ENERGIA (GeoJSON) + fallback --------------------
-  let energyLayer = null;          // L.geoJSON (polígonos)
-  let energyFeatures = [];         // features para PIP
-  let currentEnergyOpacity = 0.35; // controlado pelo slider
+  // ===== ENERGIA (GeoJSON) =====
+  let energyLayer = null;
+  let energyFeatures = [];
+  let currentEnergyOpacity = 0.45;
 
-  // fallback abrangendo Angola (para não haver “buracos”)
+  // Fallback Angola (para não haver “buracos” na classificação)
   const ANGOLA_FALLBACK = {
-    "type": "Feature",
-    "properties": { "grid_status": "unknown", "name": "Angola (fallback)" },
-    "geometry": {
-      "type": "Polygon",
-      "coordinates": [[
-        [11.6, -4.9],  [24.3, -4.9],
-        [24.3, -18.2], [11.6, -18.2],
-        [11.6, -4.9]
-      ]]
-    }
+    "type":"Feature","properties":{"grid_status":"unknown","name":"Angola (fallback)"},
+    "geometry":{"type":"Polygon","coordinates":[
+      [[11.6,-4.9],[24.3,-4.9],[24.3,-18.2],[11.6,-18.2],[11.6,-4.9]]
+    ]}
   };
 
-  function styleEnergy(f) {
-    const raw = (f.properties?.grid_status ?? "unknown");
-    const s = String(raw).trim().toLowerCase();
-    const color = s === "stable"   ? "#2ecc71"
-             : s === "unstable" ? "#f1c40f"
-             : s === "offgrid"  ? "#e74c3c" : "#95a5a6";
-    return {
-      color, opacity: 0.9, weight: 1,
-      fillColor: color, fillOpacity: currentEnergyOpacity
-    };
+  function normStatus(v){
+    const s = String(v ?? "").trim().toLowerCase();
+    if (!s) return "unknown";
+    if (s.startsWith("stab")) return "stable";
+    if (s.startsWith("inst") || s.startsWith("unst")) return "unstable";
+    if (s.startsWith("off")) return "offgrid";
+    return s;
   }
-
-  // point-in-polygon (ray casting)
-  function pip(lat, lng, polygon) {
-    const x = lng, y = lat;
-    let inside = false;
+  function styleEnergy(f){
+    const s = normStatus(f.properties?.grid_status);
+    const color = s==="stable" ? "#2ecc71" :
+                  s==="unstable" ? "#f1c40f" :
+                  s==="offgrid" ? "#e74c3c" : "#95a5a6";
+    return { color, opacity: 0.9, weight: 1, fillColor: color, fillOpacity: currentEnergyOpacity };
+  }
+  // PIP simples (ray-casting)
+  function pip(lat, lng, polygon){
+    const x = lng, y = lat; let inside=false;
     const ring = polygon.coordinates[0];
-    for (let i=0, j=ring.length-1; i<ring.length; j=i++) {
+    for (let i=0, j=ring.length-1; i<ring.length; j=i++){
       const xi = ring[i][0], yi = ring[i][1];
       const xj = ring[j][0], yj = ring[j][1];
-      const intersect = ((yi > y) !== (yj > y)) &&
-                        (x < (xj - xi) * (y - yi) / ((yj - yi) + 1e-12) + xi);
+      const intersect = ((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)+1e-12)+xi);
       if (intersect) inside = !inside;
     }
     return inside;
   }
-
-  function gridStatusAt(lat, lng) {
-    for (const f of energyFeatures) {
-      const statusVal = String(f.properties?.grid_status ?? "unknown").trim().toLowerCase();
+  function gridStatusAt(lat, lng){
+    for (const f of energyFeatures){
+      const s = normStatus(f.properties?.grid_status);
       const g = f.geometry;
-      if (g?.type === "Polygon") {
-        if (pip(lat, lng, g)) return statusVal;
-      } else if (g?.type === "MultiPolygon") {
-        for (const coords of g.coordinates) {
-          if (pip(lat, lng, { type: "Polygon", coordinates: coords })) return statusVal;
+      if (g?.type==="Polygon"){
+        if (pip(lat,lng,g)) return s;
+      } else if (g?.type==="MultiPolygon"){
+        for (const coords of g.coordinates){
+          if (pip(lat,lng,{type:"Polygon",coordinates:coords})) return s;
         }
       }
     }
     return "offgrid";
   }
-
-  function applyEnergyFromGeoJSON(gj) {
-    if (energyLayer) { map.removeLayer(energyLayer); energyLayer = null; }
-    energyLayer = L.geoJSON(gj, { style: styleEnergy, pane: "energyPane" }).addTo(map);
-    energyFeatures = (gj.features || []).slice();
-    energyFeatures.push(ANGOLA_FALLBACK); // fallback conta só para classificação
+  function applyEnergyFromGeoJSON(gj){
+    (gj.features||[]).forEach(ft=>{
+      ft.properties = ft.properties || {};
+      ft.properties.grid_status = normStatus(ft.properties.grid_status);
+    });
+    if (energyLayer){ map.removeLayer(energyLayer); energyLayer=null; }
+    energyLayer = L.geoJSON(gj, { style: styleEnergy, pane:"energyPane" }).addTo(map);
+    energyFeatures = (gj.features||[]).slice();
+    energyFeatures.push(ANGOLA_FALLBACK);
+    energyLayer.bringToFront(); setTimeout(()=>energyLayer && energyLayer.bringToFront(),0);
     try { map.fitBounds(energyLayer.getBounds(), { padding:[20,20] }); } catch {}
   }
-
-  document.getElementById("energyGeojsonInput")?.addEventListener("change", async (e) => {
+  document.getElementById("energyGeojsonInput")?.addEventListener("change", async (e)=>{
     const f = e.target.files?.[0]; if (!f) return;
     try { applyEnergyFromGeoJSON(JSON.parse(await f.text())); }
-    catch { alert("GeoJSON inválido."); }
+    catch (err){ console.error(err); alert("GeoJSON inválido (coords devem ser [lon,lat])."); }
   });
-
-  document.getElementById("clearEnergy")?.addEventListener("click", () => {
+  document.getElementById("clearEnergy")?.addEventListener("click", ()=>{
     if (energyLayer) map.removeLayer(energyLayer);
-    energyLayer = null; energyFeatures = [];
+    energyLayer=null; energyFeatures=[];
   });
-
-  // Opacidade da energia (slider opcional no HTML)
-  document.getElementById("energyOpacity")?.addEventListener("input", (e) => {
+  document.getElementById("energyOpacity")?.addEventListener("input", (e)=>{
     currentEnergyOpacity = parseFloat(e.target.value);
-    if (energyLayer) energyLayer.setStyle(styleEnergy);
+    energyLayer && energyLayer.setStyle(styleEnergy);
+  });
+  // Demo de energia (sanity check)
+  document.getElementById("loadDemoEnergy")?.addEventListener("click", ()=>{
+    const demo = {"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{"grid_status":"stable","name":"Noroeste"},
+       "geometry":{"type":"Polygon","coordinates":[[[12.0,-7.0],[15.5,-7.0],[15.5,-14.0],[12.0,-14.0],[12.0,-7.0]]]}},
+      {"type":"Feature","properties":{"grid_status":"unstable","name":"Centro"},
+       "geometry":{"type":"Polygon","coordinates":[[[15.5,-8.0],[19.5,-8.0],[19.5,-15.0],[15.5,-15.0],[15.5,-8.0]]]}},
+      {"type":"Feature","properties":{"grid_status":"offgrid","name":"Leste"},
+       "geometry":{"type":"Polygon","coordinates":[[[19.5,-8.0],[24.0,-8.0],[24.0,-18.0],[19.5,-18.0],[19.5,-8.0]]]}},
+      {"type":"Feature","properties":{"grid_status":"stable","name":"Sudoeste"},
+       "geometry":{"type":"Polygon","coordinates":[[[12.0,-14.0],[15.5,-14.0],[15.5,-18.0],[12.0,-18.0],[12.0,-14.0]]]}}
+    ]};
+    applyEnergyFromGeoJSON(demo);
   });
 
-  // -------------------- MUNICÍPIOS (ADMIN) --------------------
-  let munLayer = null;
-  let munFeatures = [];
-  const munKeyFields = ["ADM2_PCODE","ADM2_CODE","GID_2","ID_2","HASC_2","OBJECTID","FID","id","ID"];
-  const munNameFields = ["NAME_2","ADM2_PT","ADM2_EN","municipio","Municipio","MUNICIPIO","NAME"];
-  const provNameFields = ["NAME_1","ADM1_PT","ADM1_EN","provincia","Provincia","PROVINCIA","STATE","REGION","NAME_1"];
-
-  function norm(s) {
-    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-      .toLowerCase().replace(/\s+/g," ").trim();
-  }
-  function buildMunKey(props) {
-    for (const k of munKeyFields) if (props[k] != null && String(props[k]).trim() !== "") return String(props[k]);
-    let m = ""; for (const k of munNameFields) if (props[k] != null) { m = props[k]; break; }
-    let p = ""; for (const k of provNameFields) if (props[k] != null) { p = props[k]; break; }
-    return `${norm(p)}:${norm(m)}`;
-  }
-  function pickField(props, candidates) {
-    for (const k of candidates) if (props[k] != null) return k;
-    return null;
-  }
-  function munStyle(feat) { return styleEnergy(feat); }
-
-  document.getElementById("munGeojsonInput")?.addEventListener("change", async (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    try {
-      const gj = JSON.parse(await f.text());
-      (gj.features || []).forEach(feat => {
-        feat.properties = feat.properties || {};
-        feat.properties.mun_key = buildMunKey(feat.properties);
-        if (!feat.properties.grid_status) feat.properties.grid_status = "";
-      });
-      if (munLayer) map.removeLayer(munLayer);
-      munLayer = L.geoJSON(gj, { style: munStyle, pane: "energyPane" }).addTo(map);
-      munFeatures = gj.features || [];
-      try { map.fitBounds(munLayer.getBounds(), { padding:[20,20] }); } catch {}
-      alert("Municípios carregados. Gera o CSV-template, preenche e carrega em 'CSV Status'.");
-    } catch { alert("GeoJSON de municípios inválido."); }
-  });
-
-  document.getElementById("clearMun")?.addEventListener("click", () => {
-    if (munLayer) map.removeLayer(munLayer);
-    if (energyLayer === munLayer) { energyLayer = null; energyFeatures = []; }
-    munLayer = null; munFeatures = [];
-  });
-
-  document.getElementById("exportMunTemplateBtn")?.addEventListener("click", () => {
-    if (!munFeatures.length) { alert("Carrega primeiro o GeoJSON de municípios."); return; }
-    const rows = [];
-    for (const f of munFeatures) {
-      const p = f.properties || {};
-      const municipioField = pickField(p, munNameFields);
-      const provinciaField = pickField(p, provNameFields);
-      rows.push({
-        mun_key: p.mun_key || buildMunKey(p),
-        municipio: municipioField ? p[municipioField] : "",
-        provincia: provinciaField ? p[provinciaField] : "",
-        grid_status: ""  // stable/unstable/offgrid
-      });
-    }
-    const headers = ["mun_key","municipio","provincia","grid_status"];
-    const csv = [headers.join(",")].concat(rows.map(r => headers.map(h => (r[h] ?? "")).join(","))).join("\n");
-    downloadText("municipios_status_template.csv", csv);
-  });
-
-  document.getElementById("munStatusCsvInput")?.addEventListener("change", (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    Papa.parse(f, {
-      header:true, skipEmptyLines:true,
-      complete: (res) => {
-        const rows = res.data || [];
-        if (!rows.length) return alert("CSV de status vazio.");
-        const byKey = {}, byName = {};
-        rows.forEach(r => {
-          const gs = String(r.grid_status || "").toLowerCase().trim();
-          const normGs = (gs.includes("stable") || gs.includes("estavel")) ? "stable" :
-                         (gs.includes("unstable") || gs.includes("instavel")) ? "unstable" :
-                         (gs.includes("off")) ? "offgrid" : "";
-          const rec = { grid_status: normGs };
-          if (r.mun_key) byKey[String(r.mun_key)] = rec;
-          const prov = norm(r.provincia || "");
-          const mun  = norm(r.municipio || "");
-          if (prov || mun) byName[`${prov}:${mun}`] = rec;
-        });
-
-        let applied = 0;
-        munFeatures.forEach(f => {
-          const p = f.properties || {};
-          const key = p.mun_key || buildMunKey(p);
-          let val = byKey[key];
-          if (!val) {
-            const municipioField = pickField(p, munNameFields);
-            const provinciaField = pickField(p, provNameFields);
-            const nm = `${norm(p[provinciaField] || "")}:${norm(p[municipioField] || "")}`;
-            val = byName[nm];
-          }
-          if (val && val.grid_status) { p.grid_status = val.grid_status; applied++; }
-        });
-
-        if (munLayer) munLayer.setStyle(munStyle);
-        // passa a usar municípios como base de energia + fallback
-        energyFeatures = munFeatures.slice(); energyFeatures.push(ANGOLA_FALLBACK);
-        energyLayer && map.removeLayer(energyLayer);
-        energyLayer = munLayer;
-
-        alert(`Status aplicado a ${applied} municípios. Estes polígonos passam a ser usados na classificação A–D.`);
-      }
-    });
-  });
-
-  // -------------------- AGENTES & CLUSTERS --------------------
+  // ===== AGENTES + CLUSTERS =====
   function predominantZone(childMarkers) {
     const tally = { A:0, B:0, C:0, D:0 };
     childMarkers.forEach(m => {
@@ -303,7 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     let best = "neutral", max = 0;
     for (const [z,v] of Object.entries(tally)) if (v > max) { max = v; best = z.toLowerCase(); }
-    return best; // 'a'|'b'|'c'|'d'|'neutral'
+    return best;
   }
   function clusterIcon(cluster) {
     const count = cluster.getChildCount();
@@ -313,8 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return new L.DivIcon({
       html: `<div style="width:${size}px;height:${size}px;line-height:${size}px;"><span>${count}</span></div>`,
       className: `marker-cluster mc-${tier} zone-${zone}`,
-      iconSize: L.point(size, size),
-      iconAnchor: [size/2, size/2]
+      iconSize: L.point(size, size), iconAnchor: [size/2, size/2]
     });
   }
   const cluster = L.markerClusterGroup({
@@ -409,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Formato não suportado. Use CSV.");
   });
 
-  // -------------------- CLASSIFICAÇÃO A–D --------------------
+  // ===== CLASSIFICAÇÃO A–D =====
   function classifyAgent({ lat, lon, coverage }) {
     let grid = gridStatusAt(lat, lon); // stable | unstable | offgrid | unknown
     const cov  = (coverage || "").toUpperCase() || "UNKNOWN";
@@ -425,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return { grid_status: grid, coverage_best: cov, zone };
   }
 
-  // ---- Overlays de Zona (círculos, 1 por marcador) ----
+  // Círculos A–D (1 por marcador)
   let zonesVisible = true;
   const zoneCircleByMarker = new Map();
   function colorByZone(zone) {
@@ -452,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
     zoneCircleByMarker.clear();
   }
 
-  // ---- Popups com botões de cobertura + reclassificação ----
+  // Popups com botões de cobertura (edição in-place)
   function popupControlsHTML() {
     return `
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
@@ -463,6 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <button class="btn btn-mini" data-tech="5G">5G</button>
       </div>`;
   }
+  let classified = [];
   function upsertClassified(rec, info) {
     const tol = 1e-6;
     const idx = classified.findIndex(row =>
@@ -470,16 +368,13 @@ document.addEventListener("DOMContentLoaded", () => {
       Math.abs(parseFloat(row.lon) - rec.lon) < tol &&
       String(row.display || row.nome || row.name || row.title || "") === String(rec.title || "")
     );
-    const out = {
-      ...rec.data, lat: rec.lat, lon: rec.lon,
-      grid_status: info.grid_status, coverage_best: info.coverage_best, zone: info.zone
-    };
+    const out = { ...rec.data, lat: rec.lat, lon: rec.lon,
+      grid_status: info.grid_status, coverage_best: info.coverage_best, zone: info.zone };
     if (idx >= 0) classified[idx] = out; else classified.push(out);
   }
   function setCoverageAndReclass(marker, tech) {
     const rec = agentMarkers.find(a => a.marker === marker);
     if (!rec) return;
-
     rec.coverage = normalizeTech(tech);
     const info = classifyAgent({ lat: rec.lat, lon: rec.lon, coverage: rec.coverage });
 
@@ -529,10 +424,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Botão CLASSIFICAR
+  // Classificar
   document.getElementById("classifyBtn")?.addEventListener("click", () => {
     if (!agentMarkers.length)   { alert("Carrega primeiro o CSV dos agentes."); return; }
-    if (!energyFeatures.length) { alert("Carrega a camada de Energia (GeoJSON) ou aplica o CSV de status municipal."); return; }
+    if (!energyFeatures.length) { alert("Carrega a camada de Energia (GeoJSON)."); return; }
 
     clearZoneOverlays();
     classified = [];
@@ -544,24 +439,20 @@ document.addEventListener("DOMContentLoaded", () => {
       marker.zone = info.zone;
       setZoneCircle(marker, info.zone);
 
-      classified.push({
-        ...data, lat, lon,
-        grid_status: info.grid_status,
-        coverage_best: info.coverage_best,
-        zone: info.zone
-      });
+      classified.push({ ...data, lat, lon,
+        grid_status: info.grid_status, coverage_best: info.coverage_best, zone: info.zone });
     });
 
     cluster.refreshClusters && cluster.refreshClusters();
     alert("Classificação concluída. Podes exportar CSV/GeoJSON.");
   });
 
-  // Checkbox "Ver cores da Zona (A–D)"
+  // Toggle de círculos
   const toggleZones = document.getElementById("toggleZones");
   toggleZones?.addEventListener("change", (e) => setZonesVisible(e.target.checked));
   toggleZones && (toggleZones.checked = true);
 
-  // -------------------- EXPORTS --------------------
+  // Exportações
   document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
     if (!classified.length) { alert("Nada para exportar. Classifica primeiro."); return; }
     downloadText("agentes_classificados.csv", toCsv(classified));
