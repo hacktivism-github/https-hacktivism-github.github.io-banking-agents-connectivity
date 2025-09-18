@@ -23,6 +23,10 @@ html, body { height: 100%; margin: 0; }
 }
 .btn:hover { background: #eee; } .btn:active { background: #e6e6e6; }
 .btn:focus { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+
+/* Botões mini no popup */
+.btn.btn-mini { padding: 4px 6px; font-size: 12px; cursor: pointer; }
+
 .panel input[type="file"] { flex: 1; }
 
 /* ==========================================================================
