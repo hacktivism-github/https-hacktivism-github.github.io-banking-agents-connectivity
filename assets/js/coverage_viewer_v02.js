@@ -221,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let agentsData = [];
   let agentMarkers = [];    // { marker, data, lat, lon, title, coverage }
-  let classified = [];
+  let classified = [];      // <<< única declaração
 
   function pickColumn(columns, candidates) {
     const lc = columns.map(c => c.toLowerCase());
@@ -360,7 +360,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <button class="btn btn-mini" data-tech="5G">5G</button>
       </div>`;
   }
-  let classified = [];
   function upsertClassified(rec, info) {
     const tol = 1e-6;
     const idx = classified.findIndex(row =>
@@ -465,5 +464,12 @@ document.addEventListener("DOMContentLoaded", () => {
       properties: a
     }));
     downloadText("agentes_classificados.geojson", JSON.stringify({ type:"FeatureCollection", features }, null, 2));
+  });
+
+  // Helper para debugging rápido no console
+  window.__energyDebug = () => ({
+    hasLayer: !!energyLayer && map.hasLayer(energyLayer),
+    features: energyFeatures.length,
+    bounds: (energyLayer && energyLayer.getBounds && energyLayer.getBounds().toBBoxString()) || null
   });
 });
