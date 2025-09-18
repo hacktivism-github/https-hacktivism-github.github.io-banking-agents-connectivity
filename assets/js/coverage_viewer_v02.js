@@ -31,8 +31,38 @@ document.addEventListener("DOMContentLoaded", () => {
     { "OSM": osmStd, "OSM HOT": osmHOT, "Carto Positron": cartoPositron },
     null, { position: "topleft", collapsed: true }
   ).addTo(map);
-
   setTimeout(() => map.invalidateSize(), 0);
+
+  // -------------------- HELPERs (download / CSV / cobertura) --------------------
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function toCsv(arr) {
+    if (!arr.length) return "";
+    const headers = Object.keys(arr[0]);
+    const lines = [headers.join(",")];
+    for (const row of arr) lines.push(headers.map(h => (row[h] ?? "")).join(","));
+    return lines.join("\n");
+  }
+  function normalizeTech(v) {
+    const s = String(v || "").toUpperCase().trim();
+    if (!s) return "";
+    if (["NONE","NO","N/A","SEM","0"].includes(s)) return "NONE";
+    if (["2G","GSM","EDGE","E"].includes(s)) return "2G";
+    if (["3G","UMTS","H","H+","HSPA"].includes(s)) return "3G";
+    if (["4G","LTE","LTE-A","4G+"].includes(s)) return "4G";
+    if (["5G","NR","5G NSA","5G SA"].includes(s)) return "5G";
+    return s; // já normalizado
+  }
+  function bestOf(a, b) {
+    const rank = { "NONE":0, "2G":1, "3G":2, "4G":3, "5G":4 };
+    const A = normalizeTech(a) || "NONE";
+    const B = normalizeTech(b) || "NONE";
+    return (rank[A] >= rank[B]) ? A : B;
+  }
 
   // -------------------- CAMADAS nPerf (tiles) --------------------
   const URL_UNITEL   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
@@ -65,12 +95,26 @@ document.addEventListener("DOMContentLoaded", () => {
     unitelLayer.setOpacity(v); africellLayer.setOpacity(v);
   });
 
-  // -------------------- ENERGIA (GeoJSON) --------------------
+  // -------------------- ENERGIA (GeoJSON) + fallback Angola --------------------
   let energyLayer = null;          // L.geoJSON (polígonos)
   let energyFeatures = [];         // features cruas para PIP
 
+  // Cobertura total (fallback) para garantir que todo o país cai num polígono
+  const ANGOLA_FALLBACK = {
+    "type": "Feature",
+    "properties": { "grid_status": "unknown", "name": "Angola (fallback)" },
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[
+        [11.6, -4.9],  [24.3, -4.9],
+        [24.3, -18.2], [11.6, -18.2],
+        [11.6, -4.9]
+      ]]
+    }
+  };
+
   function styleEnergy(f) {
-    const s = f.properties?.grid_status || "unknown";
+    const s = (f.properties?.grid_status || "unknown").toLowerCase();
     const color = s === "stable"   ? "#2ecc71"
                : s === "unstable" ? "#f1c40f"
                : s === "offgrid"  ? "#e74c3c" : "#95a5a6";
@@ -91,16 +135,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return inside;
   }
-
   function gridStatusAt(lat, lng) {
     for (const f of energyFeatures) {
       const g = f.geometry;
       if (g?.type === "Polygon") {
-        if (pip(lat, lng, g)) return f.properties?.grid_status || "unknown";
+        if (pip(lat, lng, g)) return (f.properties?.grid_status || "unknown").toLowerCase();
       } else if (g?.type === "MultiPolygon") {
         for (const coords of g.coordinates) {
           if (pip(lat, lng, { type: "Polygon", coordinates: coords })) {
-            return f.properties?.grid_status || "unknown";
+            return (f.properties?.grid_status || "unknown").toLowerCase();
           }
         }
       }
@@ -108,23 +151,134 @@ document.addEventListener("DOMContentLoaded", () => {
     return "offgrid";
   }
 
+  function applyEnergyFromGeoJSON(gj) {
+    if (energyLayer) { map.removeLayer(energyLayer); energyLayer = null; }
+    energyLayer = L.geoJSON(gj, { style: styleEnergy }).addTo(map);
+    energyFeatures = (gj.features || []).slice();
+    energyFeatures.push(ANGOLA_FALLBACK); // fallback
+    try { map.fitBounds(energyLayer.getBounds(), { padding:[20,20] }); } catch {}
+  }
+
   document.getElementById("energyGeojsonInput")?.addEventListener("change", async (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     try {
-      const text = await f.text();
-      const gj = JSON.parse(text);
-      if (energyLayer) { map.removeLayer(energyLayer); energyLayer = null; }
-      energyLayer = L.geoJSON(gj, { style: styleEnergy }).addTo(map);
-      energyFeatures = gj.features || [];
-      try { map.fitBounds(energyLayer.getBounds(), { padding:[20,20] }); } catch {}
-    } catch (err) {
-      alert("GeoJSON inválido.");
-    }
+      const gj = JSON.parse(await f.text());
+      applyEnergyFromGeoJSON(gj);
+    } catch (err) { alert("GeoJSON inválido."); }
   });
 
   document.getElementById("clearEnergy")?.addEventListener("click", () => {
     if (energyLayer) map.removeLayer(energyLayer);
     energyLayer = null; energyFeatures = [];
+  });
+
+  // -------------------- MUNICÍPIOS (ADMIN) --------------------
+  let munLayer = null;
+  let munFeatures = [];
+  const munKeyFields = ["ADM2_PCODE","ADM2_CODE","GID_2","ID_2","HASC_2","OBJECTID","FID","id","ID"];
+  const munNameFields = ["NAME_2","ADM2_PT","ADM2_EN","municipio","Municipio","MUNICIPIO","NAME"];
+  const provNameFields = ["NAME_1","ADM1_PT","ADM1_EN","provincia","Provincia","PROVINCIA","STATE","REGION","NAME_1"];
+
+  function norm(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .toLowerCase().replace(/\s+/g," ").trim();
+  }
+  function buildMunKey(props) {
+    for (const k of munKeyFields) if (props[k] != null && String(props[k]).trim() !== "") return String(props[k]);
+    let m = ""; for (const k of munNameFields) if (props[k] != null) { m = props[k]; break; }
+    let p = ""; for (const k of provNameFields) if (props[k] != null) { p = props[k]; break; }
+    return `${norm(p)}:${norm(m)}`;
+  }
+  function pickField(props, candidates) {
+    for (const k of candidates) if (props[k] != null) return k;
+    return null;
+  }
+  function munStyle(feat) { return styleEnergy(feat); }
+
+  document.getElementById("munGeojsonInput")?.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try {
+      const gj = JSON.parse(await f.text());
+      (gj.features || []).forEach(feat => {
+        feat.properties = feat.properties || {};
+        feat.properties.mun_key = buildMunKey(feat.properties);
+        if (!feat.properties.grid_status) feat.properties.grid_status = "";
+      });
+      if (munLayer) map.removeLayer(munLayer);
+      munLayer = L.geoJSON(gj, { style: munStyle }).addTo(map);
+      munFeatures = gj.features || [];
+      try { map.fitBounds(munLayer.getBounds(), { padding:[20,20] }); } catch {}
+      alert("Municípios carregados. Gera o CSV-template, preenche e carrega em 'CSV Status'.");
+    } catch (err) { console.error(err); alert("GeoJSON de municípios inválido."); }
+  });
+
+  document.getElementById("clearMun")?.addEventListener("click", () => {
+    if (munLayer) map.removeLayer(munLayer);
+    munLayer = null; munFeatures = [];
+  });
+
+  document.getElementById("exportMunTemplateBtn")?.addEventListener("click", () => {
+    if (!munFeatures.length) { alert("Carrega primeiro o GeoJSON de municípios."); return; }
+    const rows = [];
+    for (const f of munFeatures) {
+      const p = f.properties || {};
+      const municipioField = pickField(p, munNameFields);
+      const provinciaField = pickField(p, provNameFields);
+      rows.push({
+        mun_key: p.mun_key || buildMunKey(p),
+        municipio: municipioField ? p[municipioField] : "",
+        provincia: provinciaField ? p[provinciaField] : "",
+        grid_status: ""  // por preencher: stable/unstable/offgrid
+      });
+    }
+    const headers = ["mun_key","municipio","provincia","grid_status"];
+    const csv = [headers.join(",")].concat(rows.map(r => headers.map(h => (r[h] ?? "")).join(","))).join("\n");
+    downloadText("municipios_status_template.csv", csv);
+  });
+
+  document.getElementById("munStatusCsvInput")?.addEventListener("change", (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    Papa.parse(f, {
+      header:true, skipEmptyLines:true,
+      complete: (res) => {
+        const rows = res.data || [];
+        if (!rows.length) return alert("CSV de status vazio.");
+        const byKey = {}, byName = {};
+        rows.forEach(r => {
+          const gs = String(r.grid_status || "").toLowerCase().trim();
+          const normGs = (gs.includes("stable") || gs.includes("estavel")) ? "stable" :
+                         (gs.includes("unstable") || gs.includes("instavel")) ? "unstable" :
+                         (gs.includes("off")) ? "offgrid" : "";
+          const rec = { grid_status: normGs };
+          if (r.mun_key) byKey[String(r.mun_key)] = rec;
+          const prov = norm(r.provincia || "");
+          const mun  = norm(r.municipio || "");
+          if (prov || mun) byName[`${prov}:${mun}`] = rec;
+        });
+
+        let applied = 0;
+        munFeatures.forEach(f => {
+          const p = f.properties || {};
+          const key = p.mun_key || buildMunKey(p);
+          let val = byKey[key];
+          if (!val) {
+            const municipioField = pickField(p, munNameFields);
+            const provinciaField = pickField(p, provNameFields);
+            const nm = `${norm(p[provinciaField] || "")}:${norm(p[municipioField] || "")}`;
+            val = byName[nm];
+          }
+          if (val && val.grid_status) { p.grid_status = val.grid_status; applied++; }
+        });
+
+        if (munLayer) munLayer.setStyle(munStyle);
+        // passa a usar municípios como base de energia + fallback
+        energyFeatures = munFeatures.slice(); energyFeatures.push(ANGOLA_FALLBACK);
+        energyLayer && map.removeLayer(energyLayer);
+        energyLayer = munLayer;
+
+        alert(`Status aplicado a ${applied} municípios. Estes polígonos passam a ser usados na classificação A–D.`);
+      }
+    });
   });
 
   // -------------------- AGENTES (CSV + CLUSTERS por zona) --------------------
@@ -144,7 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const zone = predominantZone(cluster.getAllChildMarkers());
     const size = tier === "sm" ? 32 : tier === "md" ? 40 : 48;
     return new L.DivIcon({
-      html: `<div><span>${count}</span></div>`,
+      html: `<div style="width:${size}px;height:${size}px;line-height:${size}px;"><span>${count}</span></div>`,
       className: `marker-cluster mc-${tier} zone-${zone}`,
       iconSize: L.point(size, size),
       iconAnchor: [size/2, size/2]
@@ -177,6 +331,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const lonCol = pickColumn(cols, ["longitude","lon","lng"]);
     const nameCol = pickColumn(cols, ["display","displayName","displayname","nome","name","title"]);
     const covCol  = pickColumn(cols, ["coverage_best","cobertura","tech","tecnologia","signal","melhor_cobertura"]);
+    const uniCol  = pickColumn(cols, ["unitel_best","unitel"]);
+    const afrCol  = pickColumn(cols, ["africell_best","africell"]);
 
     if (!latCol || !lonCol) { alert("Não encontrei colunas de latitude/longitude."); return; }
 
@@ -186,7 +342,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const lon = parseFloat(String(r[lonCol]).replace(",", "."));
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       const title = nameCol ? String(r[nameCol]) : "Agente";
-      const coverage = covCol ? String(r[covCol]).toUpperCase() : "";
+
+      const rawCoverage = covCol ? r[covCol] : "";
+      let coverage = normalizeTech(rawCoverage);
+      if (!coverage) {
+        const uni = uniCol ? r[uniCol] : "";
+        const afr = afrCol ? r[afrCol] : "";
+        const derived = bestOf(uni, afr);
+        coverage = derived !== "NONE" ? derived : ""; // se ambos NONE, mantém vazio -> B*
+      }
 
       const m = L.marker([lat, lon]).bindPopup(`<b>${title}</b><br>${lat.toFixed(5)}, ${lon.toFixed(5)}`);
       cluster.addLayer(m);
@@ -234,51 +398,129 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // -------------------- CLASSIFICAÇÃO A–D --------------------
   function classifyAgent({ lat, lon, coverage }) {
-    const grid = gridStatusAt(lat, lon);
+    let grid = gridStatusAt(lat, lon); // stable | unstable | offgrid | unknown
     const cov  = (coverage || "").toUpperCase() || "UNKNOWN";
+    const assumeUnstable = !!document.getElementById("unknownAsUnstable")?.checked;
+
+    if (grid === "unknown" && assumeUnstable) grid = "unstable";
+
     let zone = "D";
     if (grid === "offgrid") zone = "C";
     else if (grid === "stable" && (cov === "4G" || cov === "5G")) zone = "A";
-    else if (grid === "stable" || grid === "unstable") zone = (cov === "2G" || cov === "3G" || cov === "4G") ? "B" : "B*";
+    else if (grid === "stable" || grid === "unstable" || grid === "unknown") {
+      zone = (cov === "2G" || cov === "3G" || cov === "4G") ? "B" : "B*";
+    }
     return { grid_status: grid, coverage_best: cov, zone };
   }
 
-  function updateMarkerPopup(marker, info, meta) {
-    const txt =
-      `<b>${meta.name || meta.title || meta.id || "Agente"}</b><br>
-       Lat/Lon: ${(+meta.lat).toFixed(5)}, ${(+(meta.lon)).toFixed(5)}<br>
-       Energia: <b>${info.grid_status}</b><br>
-       Cobertura: <b>${info.coverage_best}</b><br>
-       Zona sugerida: <b>${info.zone}</b>`;
-    marker.setPopupContent(txt);
-  }
-
-  // ---- Overlays de Zona (círculos coloridos) ----
-  let zoneOverlays = [];
+  // ---- Overlays de Zona (círculos coloridos, 1 por marcador) ----
   let zonesVisible = true;
+  const zoneCircleByMarker = new Map();
   function colorByZone(zone) {
     return zone === "A" ? "#2ecc71" :
            (zone === "B" || zone === "B*") ? "#f1c40f" :
            zone === "C" ? "#e74c3c" : "#3498db";
   }
-  function addZoneCircle(latlng, zone) {
+  function setZoneCircle(marker, zone) {
+    const old = zoneCircleByMarker.get(marker);
+    if (old) { try { map.removeLayer(old); } catch {} }
     const col = colorByZone(zone);
-    const cm = L.circleMarker(latlng, { radius: 6, color: col, fillColor: col, fillOpacity: 0.85, weight: 1 });
+    const cm = L.circleMarker(marker.getLatLng(), {
+      radius: 6, color: col, fillColor: col, fillOpacity: 0.85, weight: 1
+    });
+    zoneCircleByMarker.set(marker, cm);
     if (zonesVisible) cm.addTo(map);
-    zoneOverlays.push(cm);
   }
   function setZonesVisible(flag) {
     zonesVisible = flag;
-    zoneOverlays.forEach(cm => flag ? map.addLayer(cm) : map.removeLayer(cm));
+    zoneCircleByMarker.forEach(cm => flag ? map.addLayer(cm) : map.removeLayer(cm));
   }
   function clearZoneOverlays() {
-    zoneOverlays.forEach(cm => map.removeLayer(cm));
-    zoneOverlays = [];
+    zoneCircleByMarker.forEach(cm => { try { map.removeLayer(cm); } catch {} });
+    zoneCircleByMarker.clear();
   }
 
+  // ---- Popups com botões de cobertura + reclassificação ----
+  function popupControlsHTML() {
+    return `
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-mini" data-tech="NONE">NONE</button>
+        <button class="btn btn-mini" data-tech="2G">2G</button>
+        <button class="btn btn-mini" data-tech="3G">3G</button>
+        <button class="btn btn-mini" data-tech="4G">4G</button>
+        <button class="btn btn-mini" data-tech="5G">5G</button>
+      </div>`;
+  }
+  function upsertClassified(rec, info) {
+    const tol = 1e-6;
+    const idx = classified.findIndex(row =>
+      Math.abs(parseFloat(row.lat) - rec.lat) < tol &&
+      Math.abs(parseFloat(row.lon) - rec.lon) < tol &&
+      String(row.display || row.nome || row.name || row.title || "") === String(rec.title || "")
+    );
+    const out = {
+      ...rec.data, lat: rec.lat, lon: rec.lon,
+      grid_status: info.grid_status, coverage_best: info.coverage_best, zone: info.zone
+    };
+    if (idx >= 0) classified[idx] = out; else classified.push(out);
+  }
+  function setCoverageAndReclass(marker, tech) {
+    const rec = agentMarkers.find(a => a.marker === marker);
+    if (!rec) return;
+
+    rec.coverage = normalizeTech(tech);
+    const info = classifyAgent({ lat: rec.lat, lon: rec.lon, coverage: rec.coverage });
+
+    const html =
+      `<b>${rec.title || "Agente"}</b><br>
+       Lat/Lon: ${(+rec.lat).toFixed(5)}, ${(+(rec.lon)).toFixed(5)}<br>
+       Energia: <b>${info.grid_status}</b><br>
+       Cobertura: <b>${info.coverage_best}</b><br>
+       Zona sugerida: <b>${info.zone}</b>
+       ${popupControlsHTML()}`;
+    marker.bindPopup(html);
+    marker.off("popupopen").on("popupopen", (e) => {
+      const cont = e.popup.getElement();
+      cont.querySelectorAll(".btn-mini").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const t = btn.getAttribute("data-tech");
+          setCoverageAndReclass(marker, t);
+          marker.openPopup();
+        });
+      });
+    });
+    marker.openPopup();
+
+    marker.zone = info.zone;
+    setZoneCircle(marker, info.zone);
+    cluster.refreshClusters && cluster.refreshClusters();
+
+    upsertClassified(rec, info);
+  }
+  function updateMarkerPopup(marker, info, meta) {
+    const html =
+      `<b>${meta.name || meta.title || meta.id || "Agente"}</b><br>
+       Lat/Lon: ${(+meta.lat).toFixed(5)}, ${(+(meta.lon)).toFixed(5)}<br>
+       Energia: <b>${info.grid_status}</b><br>
+       Cobertura: <b>${info.coverage_best}</b><br>
+       Zona sugerida: <b>${info.zone}</b>
+       ${popupControlsHTML()}`;
+    marker.bindPopup(html);
+    marker.off("popupopen").on("popupopen", (e) => {
+      const cont = e.popup.getElement();
+      cont.querySelectorAll(".btn-mini").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const tech = btn.getAttribute("data-tech");
+          setCoverageAndReclass(marker, tech);
+        });
+      });
+    });
+  }
+
+  // Botão CLASSIFICAR
   document.getElementById("classifyBtn")?.addEventListener("click", () => {
     if (!agentMarkers.length)   { alert("Carrega primeiro o CSV dos agentes."); return; }
-    if (!energyFeatures.length) { alert("Carrega o GeoJSON da rede eléctrica."); return; }
+    if (!energyFeatures.length) { alert("Carrega a camada de Energia (GeoJSON) ou aplica o CSV de status municipal."); return; }
 
     clearZoneOverlays();
     classified = [];
@@ -287,10 +529,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const info = classifyAgent({ lat, lon, coverage });
       updateMarkerPopup(marker, info, { name: title, lat, lon });
 
-      // guardar zona no marker (para clusters)
       marker.zone = info.zone;
-
-      addZoneCircle(marker.getLatLng(), info.zone);
+      setZoneCircle(marker, info.zone);
 
       classified.push({
         ...data, lat, lon,
@@ -304,30 +544,16 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Classificação concluída. Podes exportar CSV/GeoJSON.");
   });
 
+  // Checkbox "Ver cores da Zona (A–D)"
   const toggleZones = document.getElementById("toggleZones");
   toggleZones?.addEventListener("change", (e) => setZonesVisible(e.target.checked));
   toggleZones && (toggleZones.checked = true);
 
   // -------------------- EXPORTS --------------------
-  function toCsv(arr) {
-    if (!arr.length) return "";
-    const headers = Object.keys(arr[0]);
-    const lines = [headers.join(",")];
-    for (const row of arr) lines.push(headers.map(h => (row[h] ?? "")).join(","));
-    return lines.join("\n");
-  }
-  function downloadText(filename, text) {
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-  }
-
   document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
     if (!classified.length) { alert("Nada para exportar. Classifica primeiro."); return; }
     downloadText("agentes_classificados.csv", toCsv(classified));
   });
-
   document.getElementById("exportGeojsonBtn")?.addEventListener("click", () => {
     if (!classified.length) { alert("Nada para exportar. Classifica primeiro."); return; }
     const features = classified.map(a => ({
