@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <title>Mobile Operator's Coverage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="assets/css/coverage_viewer_v01.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- CSV helper -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script src="assets/js/coverage_viewer_v01.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="drop-hint" id="dropHint">Largue um CSV (agentes) aqui…</div>
+
+  <div class="panel">
+    <h3>Camadas & Dados</h3>
+
+    <div class="row">
+      <label><input type="checkbox" id="chkUnitel"> Unitel 4G (nPerf)</label>
+      <label><input type="checkbox" id="chkAfricell"> Africell 4G (nPerf)</label>
+    </div>
+
+    <div class="row">
+      <label style="min-width:80px;">Opacidade</label>
+      <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.6" style="flex:1;">
+    </div>
+
+    <hr>
+
+    <div class="row"><strong>Energia (GeoJSON)</strong></div>
+    <div class="row">
+      <input type="file" id="energyGeojsonInput" accept=".geojson,.json" />
+      <button class="btn" id="clearEnergy">Limpar</button>
+    </div>
+    <div style="color:#666; font-size:12px; margin-top:-2px;">
+      Espera polígonos com <code>properties.grid_status</code> = <em>stable | unstable | offgrid</em>.
+    </div>
+
+    <hr>
+
+    <div class="row"><strong>CSV de agentes</strong></div>
+    <div class="row">
+      <input type="file" id="csvFile" accept=".csv" />
+      <button class="btn" id="clearPoints">Limpar pontos</button>
+    </div>
+    <div style="color:#666; font-size:12px; margin-top:-2px;">
+      Auto-detecção: <em>latitude/longitude</em> e nome (ex.: <em>nome, display</em>). Coluna de cobertura é opcional (ex.: <em>coverage_best, cobertura, tech</em>).
+    </div>
+
+    <hr>
+
+    <div class="row">
+      <button class="btn" id="classifyBtn">Classificar Zonas (A–D)</button>
+      <button class="btn" id="exportCsvBtn">Exportar CSV</button>
+      <button class="btn" id="exportGeojsonBtn">Exportar GeoJSON</button>
+    </div>
+    <div style="color:#666; font-size:12px;">
+      Se não houver coluna de cobertura no CSV, a classificação usa apenas a energia (resultado provisório).
+    </div>
+  </div>
+
+  <!-- Barra tipo nPerf -->
+  <div class="nperf-bar" id="nperfBar">
+    <div class="badge" id="lastUpdate">Last update — Unitel: –, Africell: –</div>
+    <div class="techs">
+      <div class="tech"><span class="dot none"></span><span>Sem</span></div>
+      <div class="tech"><span class="dot g2"></span><span>2G</span></div>
+      <div class="tech"><span class="dot g3"></span><span>3G</span></div>
+      <div class="tech"><span class="dot g4"></span><span>4G</span></div>
+      <div class="tech"><span class="dot g5"></span><span>5G</span></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><span class="sw unitel"></span>Unitel 4G (nPerf)</div>
+    <div><span class="sw africell"></span>Africell 4G (nPerf)</div>
+    <div style="margin-top:6px;color:#666;">• Pode arrastar CSV para o mapa</div>
+  </div>
+  <div class="row">
+  <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
+</div>
+<div class="legend legend-zones" style="margin-top:8px">
+  <div><span class="sw zoneA"></span>Zona A — energia estável + 4G/5G</div>
+  <div><span class="sw zoneB"></span>Zona B — energia estável/instável + 2G/3G/4G</div>
+  <div><span class="sw zoneC"></span>Zona C — off-grid (LEO/VSAT + solar)</div>
+  <div><span class="sw zoneD"></span>Zona D — comunitária/mesh</div>
+  <div style="color:#666;margin-top:4px">B* = provisório (cobertura por confirmar)</div>
+</div>
+
+</body>
+</html>
