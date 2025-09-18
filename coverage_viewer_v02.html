@@ -42,35 +42,21 @@
 
     <div class="row"><strong>Energia (GeoJSON)</strong></div>
     <div class="row">
-      <label style="min-width:120px;">Opacidade energia</label>
-      <input type="range" id="energyOpacity" min="0" max="1" step="0.05" value="0.35" style="flex:1;">
-    </div>
-
-    <div class="row">
       <input type="file" id="energyGeojsonInput" accept=".geojson,.json" />
       <button class="btn" id="clearEnergy">Limpar</button>
     </div>
     <div class="row">
       <label><input type="checkbox" id="unknownAsUnstable"> Assumir “instável” quando sem status</label>
     </div>
+    <div class="row">
+      <label style="min-width:120px;">Opacidade energia</label>
+      <input type="range" id="energyOpacity" min="0" max="1" step="0.05" value="0.45" style="flex:1;">
+    </div>
+    <div class="row" style="gap:6px;">
+      <button class="btn" id="loadDemoEnergy">Carregar demo</button>
+    </div>
     <div style="color:#666; font-size:12px; margin-top:-2px;">
       Espera polígonos com <code>properties.grid_status</code> = <em>stable | unstable | offgrid</em>.
-    </div>
-
-    <hr>
-
-    <div class="row"><strong>Municípios (Admin)</strong></div>
-    <div class="row">
-      <input type="file" id="munGeojsonInput" accept=".geojson,.json" />
-      <button class="btn" id="clearMun">Limpar</button>
-    </div>
-    <div class="row" style="gap:6px;flex-wrap:wrap">
-      <button class="btn" id="exportMunTemplateBtn">Gerar CSV-template</button>
-      <input type="file" id="munStatusCsvInput" accept=".csv" />
-    </div>
-    <div style="color:#666; font-size:12px; margin-top:-2px;">
-      Template: <code>mun_key, municipio, provincia, grid_status</code> (valores: <em>stable/unstable/offgrid</em>).<br>
-      Ao carregar o CSV de status, os municípios são coloridos e passam a ser usados na classificação A–D.
     </div>
 
     <hr>
@@ -81,7 +67,9 @@
       <button class="btn" id="clearPoints">Limpar pontos</button>
     </div>
     <div style="color:#666; font-size:12px; margin-top:-2px;">
-      Auto-detecção: <em>latitude/longitude</em> e nome (ex.: <em>nome, display</em>). Colunas opcionais: <em>coverage_best, unitel_best, africell_best</em>.
+      Auto-detecção: <em>latitude/longitude</em> e nome (ex.: <em>nome, display</em>). O campo
+      <code>coverage_best</code> é opcional; se vier vazio, tenta derivar de
+      <code>unitel_best</code>/<code>africell_best</code>.
     </div>
 
     <hr>
@@ -94,10 +82,6 @@
 
     <div class="row">
       <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
-    </div>
-
-    <div style="color:#666; font-size:12px;">
-      Se não houver <code>coverage_best</code>, o sistema pode derivar do melhor de <code>unitel_best</code> e <code>africell_best</code>. Sem cobertura ⇒ <b>B*</b> (provisório).
     </div>
   </div>
 
@@ -123,9 +107,9 @@
   <div class="legend legend-zones">
     <div style="font-weight:700; margin-bottom:4px;">Círculos (classificação por zona)</div>
     <div><span class="dot-legend red"></span>🔴 Vermelho → <b>Zona C</b> (off-grid / sem cobertura útil)</div>
-    <div><span class="dot-legend yellow"></span>🟡 Amarelo → <b>Zona B</b> (ou <b>B*</b> quando a cobertura não está confirmada no CSV)</div>
-    <div><span class="dot-legend green"></span>🟢 (se aparecer) → <b>Zona A</b> (energia estável + 4G/5G)</div>
-    <div><span class="dot-legend blue"></span>🔵 (se aparecer) → <b>Zona D</b> (comunitária/mesh)</div>
+    <div><span class="dot-legend yellow"></span>🟡 Amarelo → <b>Zona B</b> (ou <b>B*</b> sem confirmação de cobertura)</div>
+    <div><span class="dot-legend green"></span>🟢 → <b>Zona A</b> (energia estável + 4G/5G)</div>
+    <div><span class="dot-legend blue"></span>🔵 → <b>Zona D</b> (comunitária/mesh)</div>
 
     <hr style="border:none;border-top:1px solid #e4e4e4;margin:8px 0;">
     <div style="font-weight:700; margin-bottom:4px;">Clusters</div>
