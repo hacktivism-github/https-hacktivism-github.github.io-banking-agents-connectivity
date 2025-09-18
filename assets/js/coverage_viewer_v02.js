@@ -33,7 +33,11 @@ document.addEventListener("DOMContentLoaded", () => {
   ).addTo(map);
   setTimeout(() => map.invalidateSize(), 0);
 
-  // -------------------- HELPERs (download / CSV / cobertura) --------------------
+  // Pane dedicado à energia (acima dos tiles, abaixo dos marcadores)
+  map.createPane("energyPane");
+  map.getPane("energyPane").style.zIndex = 350;
+
+  // -------------------- HELPERS --------------------
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -55,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (["3G","UMTS","H","H+","HSPA"].includes(s)) return "3G";
     if (["4G","LTE","LTE-A","4G+"].includes(s)) return "4G";
     if (["5G","NR","5G NSA","5G SA"].includes(s)) return "5G";
-    return s; // já normalizado
+    return s;
   }
   function bestOf(a, b) {
     const rank = { "NONE":0, "2G":1, "3G":2, "4G":3, "5G":4 };
@@ -64,10 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return (rank[A] >= rank[B]) ? A : B;
   }
 
-  // -------------------- CAMADAS nPerf (tiles) --------------------
+  // -------------------- nPerf (tiles) --------------------
   const URL_UNITEL   = "https://app.nperf.com/signal-220836-{z}-{x}-{y}.webp";
   const URL_AFRICELL = "https://app.nperf.com/signal-2019555-{z}-{x}-{y}.webp";
-
   const LAST_UPDATE_UNITEL   = "09/07/2025 10:37 UTC";
   const LAST_UPDATE_AFRICELL = "09/04/2025 18:53 UTC";
 
@@ -95,11 +98,12 @@ document.addEventListener("DOMContentLoaded", () => {
     unitelLayer.setOpacity(v); africellLayer.setOpacity(v);
   });
 
-  // -------------------- ENERGIA (GeoJSON) + fallback Angola --------------------
+  // -------------------- ENERGIA (GeoJSON) + fallback --------------------
   let energyLayer = null;          // L.geoJSON (polígonos)
-  let energyFeatures = [];         // features cruas para PIP
+  let energyFeatures = [];         // features para PIP
+  let currentEnergyOpacity = 0.35; // controlado pelo slider
 
-  // Cobertura total (fallback) para garantir que todo o país cai num polígono
+  // fallback abrangendo Angola (para não haver “buracos”)
   const ANGOLA_FALLBACK = {
     "type": "Feature",
     "properties": { "grid_status": "unknown", "name": "Angola (fallback)" },
@@ -114,11 +118,15 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function styleEnergy(f) {
-    const s = (f.properties?.grid_status || "unknown").toLowerCase();
+    const raw = (f.properties?.grid_status ?? "unknown");
+    const s = String(raw).trim().toLowerCase();
     const color = s === "stable"   ? "#2ecc71"
-               : s === "unstable" ? "#f1c40f"
-               : s === "offgrid"  ? "#e74c3c" : "#95a5a6";
-    return { color, weight: 1, fillColor: color, fillOpacity: 0.25 };
+             : s === "unstable" ? "#f1c40f"
+             : s === "offgrid"  ? "#e74c3c" : "#95a5a6";
+    return {
+      color, opacity: 0.9, weight: 1,
+      fillColor: color, fillOpacity: currentEnergyOpacity
+    };
   }
 
   // point-in-polygon (ray casting)
@@ -135,16 +143,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return inside;
   }
+
   function gridStatusAt(lat, lng) {
     for (const f of energyFeatures) {
+      const statusVal = String(f.properties?.grid_status ?? "unknown").trim().toLowerCase();
       const g = f.geometry;
       if (g?.type === "Polygon") {
-        if (pip(lat, lng, g)) return (f.properties?.grid_status || "unknown").toLowerCase();
+        if (pip(lat, lng, g)) return statusVal;
       } else if (g?.type === "MultiPolygon") {
         for (const coords of g.coordinates) {
-          if (pip(lat, lng, { type: "Polygon", coordinates: coords })) {
-            return (f.properties?.grid_status || "unknown").toLowerCase();
-          }
+          if (pip(lat, lng, { type: "Polygon", coordinates: coords })) return statusVal;
         }
       }
     }
@@ -153,23 +161,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyEnergyFromGeoJSON(gj) {
     if (energyLayer) { map.removeLayer(energyLayer); energyLayer = null; }
-    energyLayer = L.geoJSON(gj, { style: styleEnergy }).addTo(map);
+    energyLayer = L.geoJSON(gj, { style: styleEnergy, pane: "energyPane" }).addTo(map);
     energyFeatures = (gj.features || []).slice();
-    energyFeatures.push(ANGOLA_FALLBACK); // fallback
+    energyFeatures.push(ANGOLA_FALLBACK); // fallback conta só para classificação
     try { map.fitBounds(energyLayer.getBounds(), { padding:[20,20] }); } catch {}
   }
 
   document.getElementById("energyGeojsonInput")?.addEventListener("change", async (e) => {
     const f = e.target.files?.[0]; if (!f) return;
-    try {
-      const gj = JSON.parse(await f.text());
-      applyEnergyFromGeoJSON(gj);
-    } catch (err) { alert("GeoJSON inválido."); }
+    try { applyEnergyFromGeoJSON(JSON.parse(await f.text())); }
+    catch { alert("GeoJSON inválido."); }
   });
 
   document.getElementById("clearEnergy")?.addEventListener("click", () => {
     if (energyLayer) map.removeLayer(energyLayer);
     energyLayer = null; energyFeatures = [];
+  });
+
+  // Opacidade da energia (slider opcional no HTML)
+  document.getElementById("energyOpacity")?.addEventListener("input", (e) => {
+    currentEnergyOpacity = parseFloat(e.target.value);
+    if (energyLayer) energyLayer.setStyle(styleEnergy);
   });
 
   // -------------------- MUNICÍPIOS (ADMIN) --------------------
@@ -205,15 +217,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!feat.properties.grid_status) feat.properties.grid_status = "";
       });
       if (munLayer) map.removeLayer(munLayer);
-      munLayer = L.geoJSON(gj, { style: munStyle }).addTo(map);
+      munLayer = L.geoJSON(gj, { style: munStyle, pane: "energyPane" }).addTo(map);
       munFeatures = gj.features || [];
       try { map.fitBounds(munLayer.getBounds(), { padding:[20,20] }); } catch {}
       alert("Municípios carregados. Gera o CSV-template, preenche e carrega em 'CSV Status'.");
-    } catch (err) { console.error(err); alert("GeoJSON de municípios inválido."); }
+    } catch { alert("GeoJSON de municípios inválido."); }
   });
 
   document.getElementById("clearMun")?.addEventListener("click", () => {
     if (munLayer) map.removeLayer(munLayer);
+    if (energyLayer === munLayer) { energyLayer = null; energyFeatures = []; }
     munLayer = null; munFeatures = [];
   });
 
@@ -228,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
         mun_key: p.mun_key || buildMunKey(p),
         municipio: municipioField ? p[municipioField] : "",
         provincia: provinciaField ? p[provinciaField] : "",
-        grid_status: ""  // por preencher: stable/unstable/offgrid
+        grid_status: ""  // stable/unstable/offgrid
       });
     }
     const headers = ["mun_key","municipio","provincia","grid_status"];
@@ -281,7 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // -------------------- AGENTES (CSV + CLUSTERS por zona) --------------------
+  // -------------------- AGENTES & CLUSTERS --------------------
   function predominantZone(childMarkers) {
     const tally = { A:0, B:0, C:0, D:0 };
     childMarkers.forEach(m => {
@@ -323,7 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function addCsvPoints(rows) {
-    cluster.clearLayers(); agentMarkers = []; classified = [];
+    cluster.clearLayers(); agentMarkers = []; classified = []; clearZoneOverlays();
     if (!rows.length) return;
 
     const cols   = Object.keys(rows[0]);
@@ -401,7 +414,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let grid = gridStatusAt(lat, lon); // stable | unstable | offgrid | unknown
     const cov  = (coverage || "").toUpperCase() || "UNKNOWN";
     const assumeUnstable = !!document.getElementById("unknownAsUnstable")?.checked;
-
     if (grid === "unknown" && assumeUnstable) grid = "unstable";
 
     let zone = "D";
@@ -413,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return { grid_status: grid, coverage_best: cov, zone };
   }
 
-  // ---- Overlays de Zona (círculos coloridos, 1 por marcador) ----
+  // ---- Overlays de Zona (círculos, 1 por marcador) ----
   let zonesVisible = true;
   const zoneCircleByMarker = new Map();
   function colorByZone(zone) {
