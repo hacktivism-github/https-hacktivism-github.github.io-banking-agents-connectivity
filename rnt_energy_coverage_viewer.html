@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RNT → OSM Digitizer (Zones A–D) — Minimal (fixed)</title>
+  <title>RNT → OSM Digitizer (Zones A–D) — Lines color & delete</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -48,8 +48,8 @@
     <div class="row"><label>Select provider</label></div>
     <div class="row">
       <select id="basemapSel">
-        <option value="OSM" selected>OpenStreetMap</option>
         <option value="ESRI" selected>Esri Streets</option>
+        <option value="OSM">OpenStreetMap</option>
         <option value="CARTO">Carto Light</option>
       </select>
       <button class="btn" id="btnTestMarker">Test marker</button>
@@ -299,6 +299,63 @@
     const sitesLayer=L.layerGroup().addTo(map);
     const linesLayer=L.layerGroup().addTo(map);
 
+    // --- Transmission lines helpers (color/edit/delete) ---
+    function attachLineEditor(layer){
+      function midLatLng(lls){
+        // calcula o ponto médio aproximado para abrir o popup
+        if(!lls.length) return map.getCenter();
+        const mid = lls[Math.floor(lls.length/2)];
+        return mid;
+      }
+      function buildPopup(layer){
+        const color = layer.options.color || '#111827';
+        const weight = layer.options.weight || 3;
+        const opacity = (layer.options.opacity ?? 0.9);
+        const html = document.createElement('div');
+        html.style.minWidth = '220px';
+        html.innerHTML = `
+          <div style="font-weight:700;margin-bottom:6px">Transmission line</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center">
+            <label>Color</label><input id="line_color" type="color" value="${color.startsWith('#')?color:toHex(color)}" />
+            <label>Weight</label><input id="line_weight" type="number" min="1" max="8" value="${weight}" />
+            <label>Opacity</label><input id="line_op" type="number" step="0.1" min="0" max="1" value="${opacity}" />
+          </div>
+          <div class="hr"></div>
+          <button id="line_save" class="btn primary">Save</button>
+          <button id="line_delete" class="btn" style="margin-left:6px">Delete</button>
+        `;
+        // ações
+        html.querySelector('#line_save').onclick=()=>{
+          const c = html.querySelector('#line_color').value;
+          const w = +html.querySelector('#line_weight').value || 3;
+          const o = +html.querySelector('#line_op').value;
+          layer.setStyle({ color:c, weight:w, opacity:isFinite(o)?o:0.9 });
+          map.closePopup();
+        };
+        html.querySelector('#line_delete').onclick=()=>{
+          linesLayer.removeLayer(layer);
+          map.closePopup();
+        };
+        return html;
+      }
+      function toHex(cssColor){
+        // fallback simples; se vier "rgb(...)", tenta converter
+        const m = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)/i.exec(cssColor);
+        if(!m) return '#111827';
+        const to2=x=>('0'+Number(x).toString(16)).slice(-2);
+        return '#'+to2(m[1])+to2(m[2])+to2(m[3]);
+      }
+
+      // abrir popup ao clicar
+      layer.on('click', ()=>{
+        const html = buildPopup(layer);
+        L.popup()
+          .setLatLng(midLatLng(layer.getLatLngs()))
+          .setContent(html)
+          .openOn(map);
+      });
+    }
+
     // Add modes (click map)
     let addMode=null;
     const btnAddSub = document.getElementById('btnAddSub');
@@ -360,7 +417,14 @@
       currentDraw.enable();
     };
     document.getElementById('btnStopDraw').onclick=()=>{ if(currentDraw) currentDraw.disable(); currentDraw=null; };
-    map.on(L.Draw.Event.CREATED, e=>{ if(e.layerType==='polyline'){ linesLayer.addLayer(e.layer); } });
+    map.on(L.Draw.Event.CREATED, e=>{
+      if(e.layerType==='polyline'){
+        const layer = e.layer;
+        layer.setStyle(drawOptions.polyline.shapeOptions);
+        attachLineEditor(layer);
+        linesLayer.addLayer(layer);
+      }
+    });
 
     // Data I/O
     document.getElementById('btnExport').onclick=()=>{
@@ -377,7 +441,17 @@
       });
       linesLayer.eachLayer(l=>{
         const coords=l.getLatLngs().map(ll=>[ll.lng,ll.lat]);
-        fc.features.push({ type:'Feature', geometry:{ type:'LineString', coordinates:coords }, properties:{ type:'transmission_line' } });
+        const opts = l.options || {};
+        fc.features.push({
+          type:'Feature',
+          geometry:{ type:'LineString', coordinates:coords },
+          properties:{
+            type:'transmission_line',
+            color: opts.color || '#111827',
+            weight: opts.weight || 3,
+            opacity: (opts.opacity ?? 0.9)
+          }
+        });
       });
       downloadText('rnt_osm_digitized.geojson', JSON.stringify(fc,null,2));
     };
@@ -415,7 +489,12 @@
           SITES.push(rec); pts.push([rec.lat,rec.lng]);
         } else if(g.type==='LineString'){
           const latlngs=(g.coordinates||[]).map(([lng,lat])=>L.latLng(lat,lng));
-          L.polyline(latlngs, drawOptions.polyline.shapeOptions).addTo(linesLayer);
+          const color = p.color || '#111827';
+          const weight = p.weight || 3;
+          const opacity = (p.opacity ?? 0.9);
+          const layer = L.polyline(latlngs, { color, weight, opacity });
+          attachLineEditor(layer);
+          linesLayer.addLayer(layer);
         }
       });
       redrawSites();
