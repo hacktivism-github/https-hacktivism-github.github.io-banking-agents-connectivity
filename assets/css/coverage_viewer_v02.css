@@ -23,11 +23,10 @@ html, body { height: 100%; margin: 0; }
 }
 .btn:hover { background: #eee; } .btn:active { background: #e6e6e6; }
 .btn:focus { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+.panel input[type="file"] { flex: 1; }
 
 /* Botões mini no popup */
 .btn.btn-mini { padding: 4px 6px; font-size: 12px; cursor: pointer; }
-
-.panel input[type="file"] { flex: 1; }
 
 /* ==========================================================================
    Drag & Drop hint
@@ -71,15 +70,30 @@ html, body { height: 100%; margin: 0; }
   background: rgba(255,255,255,.9); padding: 8px 10px; border-radius: 6px;
   font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
-.legend.legend-zones { bottom: 96px; } /* sobe um pouco para não colidir com a barra */
+.legend.legend-zones { bottom: 110px; } /* sobe para não colidir com a barra */
+
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -2px; }
 .sw.unitel { background:#6c3fd6; } .sw.africell { background:#d94b4b; }
 
-/* Zonas A–D (legenda) */
-.sw.zoneA { background:#2ecc71; } /* verde */
-.sw.zoneB { background:#f1c40f; } /* amarelo */
-.sw.zoneC { background:#e74c3c; } /* vermelho */
-.sw.zoneD { background:#3498db; } /* azul */
+/* Pontinhos da legenda (mesmas cores dos circleMarkers) */
+.dot-legend {
+  display:inline-block; width:12px; height:12px; border-radius:50%;
+  margin-right:6px; vertical-align:-2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+}
+.dot-legend.red    { background:#e74c3c; }  /* Zona C */
+.dot-legend.yellow { background:#f1c40f; }  /* Zona B/B* */
+.dot-legend.green  { background:#2ecc71; }  /* Zona A */
+.dot-legend.blue   { background:#3498db; }  /* Zona D */
+
+/* Amostra de cluster na legenda */
+.cluster-sample {
+  display:inline-block; width:18px; height:18px; border-radius:50%;
+  margin-right:6px; vertical-align:-4px; border:2px solid rgba(0,0,0,.25);
+}
+.cluster-sample.zone-a { background:#2ecc71; }
+.cluster-sample.zone-b { background:#f1c40f; }
+.cluster-sample.zone-c { background:#e74c3c; }
+.cluster-sample.zone-d { background:#3498db; }
 
 /* ==========================================================================
    MarkerCluster — cores por zona predominante
@@ -90,17 +104,10 @@ html, body { height: 100%; margin: 0; }
   color: #fff;
   font-weight: 700;
   text-align: center;
-  line-height: 32px; /* ajustado via tamanho */
 }
-.marker-cluster.mc-sm  { border: 2px solid rgba(0,0,0,.20); }
-.marker-cluster.mc-md  { border: 2px solid rgba(0,0,0,.25); }
-.marker-cluster.mc-lg  { border: 2px solid rgba(0,0,0,.30); }
-
-/* Tamanhos do “círculo” do cluster */
 .marker-cluster.mc-sm  div { width: 32px; height: 32px; line-height: 32px; }
 .marker-cluster.mc-md  div { width: 40px; height: 40px; line-height: 40px; }
 .marker-cluster.mc-lg  div { width: 48px; height: 48px; line-height: 48px; }
-
 
 .marker-cluster.zone-a div { background:#2ecc71; }        /* A */
 .marker-cluster.zone-b div { background:#f1c40f; color:#333; } /* B (melhor contraste) */
@@ -117,7 +124,7 @@ html, body { height: 100%; margin: 0; }
 @media (max-width: 640px) {
   .panel { right: 8px; top: 8px; width: calc(100vw - 16px); }
   .nperf-bar, .legend { left: 8px; right: 8px; bottom: 8px; }
-  .legend.legend-zones { bottom: 96px; left: 8px; right: auto; }
+  .legend.legend-zones { bottom: 110px; left: 8px; right: auto; }
   .nperf-bar { flex-wrap: wrap; gap: 8px; }
 }
 
