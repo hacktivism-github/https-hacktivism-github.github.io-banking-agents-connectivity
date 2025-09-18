@@ -1,1 +1,248 @@
+/* ==========================================================================
+   Coverage Viewer — Global Layout
+   ========================================================================== */
 
+html, body, #map {
+  height: 100%;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Controls Panel (top-right)
+   ========================================================================== */
+
+.panel {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 1000;
+  width: 340px;
+  max-width: calc(100vw - 20px);
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.panel h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.row {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row label {
+  white-space: nowrap;
+}
+
+.btn {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f6f6f6;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.btn:hover { background: #eee; }
+.btn:active { background: #e6e6e6; }
+.btn:focus { outline: 2px solid #7aa7ff; outline-offset: 2px; }
+
+/* File input spacing inside the panel */
+.panel input[type="file"] {
+  flex: 1;
+}
+
+/* ==========================================================================
+   Drag & Drop Hint (center overlay)
+   ========================================================================== */
+
+.drop-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  z-index: 1200;
+  display: none;
+  pointer-events: none;
+
+  background: rgba(0,0,0,.65);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font: 13px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ==========================================================================
+   NPerf-style Compact Bar (bottom-right)
+   ========================================================================== */
+
+.nperf-bar {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 900;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  background: rgba(255,255,255,.92);
+  padding: 8px 10px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+  font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.badge {
+  background: rgba(255,255,255,.95);
+  border: 1px solid #e4e4e4;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.techs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tech {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  border: 1px solid #e4e4e4;
+  background: #fff;
+  padding: 3px 6px;
+  border-radius: 14px;
+
+  color: #333;
+  font-weight: 600;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.12);
+}
+
+/* Coverage dots */
+.dot.none { background:#bdbdbd; }   /* Sem cobertura */
+.dot.g2   { background:#555; }
+.dot.g3   { background:#46c35f; }
+.dot.g4   { background:#ff7f32; }   /* 4G/LTE */
+.dot.g5   { background:#8e44ad; }   /* 5G */
+
+/* ==========================================================================
+   Legend (bottom-left)
+   ========================================================================== */
+
+.legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 800;
+
+  background: rgba(255,255,255,.9);
+  padding: 8px 10px;
+  border-radius: 6px;
+
+  font: 12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.sw {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.sw.unitel   { background:#6c3fd6; }
+.sw.africell { background:#d94b4b; }
+
+/* ==========================================================================
+   Leaflet MarkerCluster overrides (optional touch-ups)
+   ========================================================================== */
+
+/* slightly tighter cluster look */
+.leaflet-marker-icon.marker-cluster-small,
+.leaflet-marker-icon.marker-cluster-medium,
+.leaflet-marker-icon.marker-cluster-large {
+  border: 2px solid rgba(0,0,0,.15);
+}
+
+/* Zonas A–D (legenda) */
+.sw.zoneA { background:#2ecc71; } /* verde */
+.sw.zoneB { background:#f1c40f; } /* amarelo */
+.sw.zoneC { background:#e74c3c; } /* vermelho */
+.sw.zoneD { background:#3498db; } /* azul */
+
+/* Garantir que os círculos de zona ficam visíveis por cima do mapa */
+.leaflet-interactive { z-index: 450 !important; }
+
+/* ==========================================================================
+   Responsive tweaks
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .panel {
+    right: 8px;
+    top: 8px;
+    width: calc(100vw - 16px);
+  }
+  .nperf-bar, .legend {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+  .nperf-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* ==========================================================================
+   Print-friendly (hide UI, keep map snapshot)
+   ========================================================================== */
+
+@media print {
+  .panel, .legend, .nperf-bar, .drop-hint { display: none !important; }
+  #map { height: auto; }
+}
+
+/* ==========================================================================
+   (Optional) Dark-mode adjustments
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  .panel,
+  .legend,
+  .nperf-bar {
+    background: rgba(30,30,30,.92);
+    color: #e6e6e6;
+  }
+  .panel { box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+  .badge,
+  .tech {
+    background: #1e1e1e;
+    color: #e6e6e6;
+    border-color: #3a3a3a;
+  }
+  .btn {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+    color: #e6e6e6;
+  }
+  .btn:hover { background: #333; }
+}
