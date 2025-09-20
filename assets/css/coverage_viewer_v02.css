@@ -14,16 +14,40 @@ html, body { height: 100%; margin: 0; }
   box-shadow: 0 2px 10px rgba(0,0,0,.15);
   font: 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
-.panel h3 { margin: 0 0 6px; font-size: 14px; }
+
+/* Título com (nPerf tiles) ao lado */
+.panel .titleline {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.panel .titleline h3 { margin: 0; font-size: 14px; }
+.panel .titleline small {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: 400;
+}
+
+/* Linhas do painel e controlos */
 .row { margin: 6px 0; display: flex; align-items: center; gap: 8px; }
 .row label { white-space: nowrap; }
+.panel input[type="file"] { flex: 1; }
+
+/* Destaque igual para as operadoras */
+.panel .row.carriers label {
+  font-weight: 700;
+  color: #333;
+}
+
+/* Botões */
 .btn {
   padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px;
   background: #f6f6f6; cursor: pointer; transition: background .15s ease, border-color .15s ease;
 }
-.btn:hover { background: #eee; } .btn:active { background: #e6e6e6; }
+.btn:hover { background: #eee; }
+.btn:active { background: #e6e6e6; }
 .btn:focus { outline: 2px solid #7aa7ff; outline-offset: 2px; }
-.panel input[type="file"] { flex: 1; }
 
 /* Botões mini no popup */
 .btn.btn-mini { padding: 4px 6px; font-size: 12px; cursor: pointer; }
@@ -109,11 +133,11 @@ html, body { height: 100%; margin: 0; }
 .marker-cluster.mc-md  div { width: 40px; height: 40px; line-height: 40px; }
 .marker-cluster.mc-lg  div { width: 48px; height: 48px; line-height: 48px; }
 
-.marker-cluster.zone-a div { background:#2ecc71; }        /* A */
-.marker-cluster.zone-b div { background:#f1c40f; color:#333; } /* B (melhor contraste) */
-.marker-cluster.zone-c div { background:#e74c3c; }        /* C */
-.marker-cluster.zone-d div { background:#3498db; }        /* D */
-.marker-cluster.zone-neutral div { background:#9e9e9e; }  /* antes de classificar */
+.marker-cluster.zone-a div { background:#2ecc71; }             /* A */
+.marker-cluster.zone-b div { background:#f1c40f; color:#333; }  /* B (melhor contraste) */
+.marker-cluster.zone-c div { background:#e74c3c; }              /* C */
+.marker-cluster.zone-d div { background:#3498db; }              /* D */
+.marker-cluster.zone-neutral div { background:#9e9e9e; }        /* antes de classificar */
 
 /* Garantir visibilidade dos círculos de zona */
 .leaflet-interactive { z-index: 450 !important; }
@@ -145,4 +169,6 @@ html, body { height: 100%; margin: 0; }
   .badge, .tech { background:#1e1e1e; color:#e6e6e6; border-color:#3a3a3a; }
   .btn { background:#2a2a2a; border-color:#3a3a3a; color:#e6e6e6; }
   .btn:hover { background:#333; }
+
+  .panel .titleline small { color:#bdbdbd; } /* nota do título em dark mode */
 }
