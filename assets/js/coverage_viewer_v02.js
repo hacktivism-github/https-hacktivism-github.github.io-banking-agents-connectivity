@@ -451,11 +451,80 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleZones?.addEventListener("change", (e) => setZonesVisible(e.target.checked));
   toggleZones && (toggleZones.checked = true);
 
-  // Exportações
+  // ===== CSV EXPORT (ordenado e sem duplicados) =====
+  const CSV_SEP_DEFAULT = /^(pt|pt-|fr|de|es|it)/i.test(navigator.language || "") ? ";" : ",";
+  function csvEscape(v, sep) {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return /["\n\r]/.test(s) || s.includes(sep) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  function toCsvOrdered(rows, columns, sep = CSV_SEP_DEFAULT) {
+    const header = columns.map(c => c.label).join(sep);
+    const lines  = rows.map(r => columns.map(c => csvEscape(r[c.key], sep)).join(sep));
+    return [header, ...lines].join("\n");
+  }
+  const coalesce = (...vals) => {
+    for (const v of vals) if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+    return "";
+  };
+  const fmtCoord = (n) => {
+    const x = Number(n);
+    return Number.isFinite(x) ? x.toFixed(6) : "";
+  };
+  const EXPORT_COLUMNS = [
+    { key: "provincia",    label: "provincia" },
+    { key: "municipio",    label: "municipio" },
+    { key: "rua",          label: "rua" },
+    { key: "nome",         label: "nome" },
+    { key: "latitude",     label: "latitude" },
+    { key: "longitude",    label: "longitude" },
+    { key: "metodo",       label: "metodo" },
+    { key: "display",      label: "display" },
+    { key: "unitel_best",  label: "unitel_best" },
+    { key: "africell_best",label: "africell_best" },
+    { key: "coverage_best",label: "coverage_best" },
+    { key: "grid_status",  label: "grid_status" },
+    { key: "zone",         label: "zone" }
+  ];
+
   document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
     if (!classified.length) { alert("Nada para exportar. Classifica primeiro."); return; }
-    downloadText("agentes_classificados.csv", toCsv(classified));
+
+    const rows = classified.map(a => {
+      const nome = coalesce(a.nome, a.name, a.displayName, a.title, a.display);
+      return {
+        provincia:     coalesce(a.provincia, a.province),
+        municipio:     coalesce(a.municipio, a.municipality, a.mun, a.munic),
+        rua:           coalesce(a.rua, a.address, a.logradouro),
+        nome,
+
+        latitude:      fmtCoord(a.lat ?? a.latitude),
+        longitude:     fmtCoord(a.lon ?? a.longitude),
+
+        metodo:        coalesce(a.metodo, a.method),
+        display:       a.display ?? "",
+        unitel_best:   coalesce(a.unitel_best, a.unitel),
+        africell_best: coalesce(a.africell_best, a.africell),
+        coverage_best: a.coverage_best,
+
+        grid_status:   a.grid_status,
+        zone:          a.zone
+      };
+    });
+
+    // Ordenar por província → município → nome
+    rows.sort((r1, r2) =>
+      (r1.provincia || "").localeCompare(r2.provincia || "", "pt") ||
+      (r1.municipio || "").localeCompare(r2.municipio || "", "pt") ||
+      (r1.nome || "").localeCompare(r2.nome || "", "pt")
+    );
+
+    const SEP = CSV_SEP_DEFAULT; // força vírgula se preferires: const SEP = ",";
+    const csv = "\ufeff" + toCsvOrdered(rows, EXPORT_COLUMNS, SEP); // BOM p/ Excel/Numbers
+    downloadText("agentes_classificados.csv", csv);
   });
+
+  // GeoJSON export (mantido)
   document.getElementById("exportGeojsonBtn")?.addEventListener("click", () => {
     if (!classified.length) { alert("Nada para exportar. Classifica primeiro."); return; }
     const features = classified.map(a => ({
