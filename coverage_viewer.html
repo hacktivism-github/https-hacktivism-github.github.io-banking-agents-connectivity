@@ -33,7 +33,7 @@
       <label><input type="checkbox" id="chkUnitel"> Unitel</label>
       <label><input type="checkbox" id="chkAfricell"> Africell</label>
     </div>
-  -->
+
 
   <div class="panel">
   <div style="display:flex; align-items:baseline; gap:6px;">
@@ -105,6 +105,72 @@
       <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
     </div>
   </div>
+-->
+
+  <!-- PAINEL -->
+<div class="panel">
+  <div class="titleline">
+    <h3>Mapa de Cobertura: 3G | 4G | 5G</h3>
+    <small>(nPerf tiles)</small>
+  </div>
+
+  <div class="row carriers">
+    <label><input type="checkbox" id="chkUnitel"> Unitel</label>
+    <label><input type="checkbox" id="chkAfricell"> Africell</label>
+  </div>
+
+  <div class="row">
+    <label style="min-width:80px;">Opacidade</label>
+    <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.6" style="flex:1;">
+  </div>
+
+  <hr>
+
+  <div class="row"><strong>Energia (GeoJSON)</strong></div>
+  <div class="row">
+    <input type="file" id="energyGeojsonInput" accept=".geojson,.json" />
+    <button class="btn" id="clearEnergy">Limpar</button>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="unknownAsUnstable"> Assumir “instável” quando sem status</label>
+  </div>
+  <div class="row">
+    <label style="min-width:120px;">Opacidade energia</label>
+    <input type="range" id="energyOpacity" min="0" max="1" step="0.05" value="0.45" style="flex:1;">
+  </div>
+  <div class="row" style="gap:6px;">
+    <button class="btn" id="loadDemoEnergy">Carregar demo</button>
+  </div>
+  <div style="color:#666; font-size:12px; margin-top:-2px;">
+    Espera polígonos com <code>properties.grid_status</code> = <em>stable | unstable | offgrid</em>.
+  </div>
+
+  <hr>
+
+  <div class="row"><strong>CSV de agentes</strong></div>
+  <div class="row">
+    <input type="file" id="csvFile" accept=".csv" />
+    <button class="btn" id="clearPoints">Limpar pontos</button>
+  </div>
+  <div style="color:#666; font-size:12px; margin-top:-2px;">
+    Auto-detecção: <em>latitude/longitude</em> e nome (ex.: <em>nome, display</em>). O campo
+    <code>coverage_best</code> é opcional; se vier vazio, tenta derivar de
+    <code>unitel_best</code>/<code>africell_best</code>.
+  </div>
+
+  <hr>
+
+  <div class="row" style="gap:6px; flex-wrap:wrap">
+    <button class="btn" id="classifyBtn">Classificar Zonas (A–D)</button>
+    <button class="btn" id="exportCsvBtn">Exportar CSV</button>
+    <button class="btn" id="exportGeojsonBtn">Exportar GeoJSON</button>
+  </div>
+
+  <div class="row">
+    <label><input type="checkbox" id="toggleZones" checked> Ver cores da Zona (A–D)</label>
+  </div>
+</div>
+
 
   <!-- Barra estilo nPerf -->
   <div class="nperf-bar" id="nperfBar">
