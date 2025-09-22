@@ -130,7 +130,8 @@
     let baseLayer=null, tilesLoaded=0, gridLayer=null, gridOn=false;
 
     function setBasemap(key){
-      const cfg = providers[key] || providers.ESRI;
+//      const cfg = providers[key] || providers.ESRI;
+      const cfg = providers[key] || providers.OSM;
       if (baseLayer) map.removeLayer(baseLayer);
       if (gridLayer) {
         map.removeLayer(gridLayer); gridLayer=null; gridOn=false;
@@ -171,7 +172,8 @@
       document.body.appendChild(note);
     }
 
-    setBasemap('ESRI');
+//    setBasemap('ESRI');
+    setBasemap('OSM');
     setTimeout(()=>map.invalidateSize(), 120);
 
     // --- State & helpers ---
