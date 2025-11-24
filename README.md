@@ -18,7 +18,23 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
   * **D** — comunitária/mesh (acesso partilhado / energia híbrida)
 * **Exporta resultados para CSV** (limpo, cabeçalhos mínimos) ou **GeoJSON** para relatórios e follow-up.
 
+## Arranque rápido
+
+1. Apontes o seu navegador para [Coverage viewer](https://hacktivism-github.github.io/https-hacktivism-github.github.io-banking-agents-connectivity/coverage_viewer.html)
+
+2. Liga/desliga Unitel / Africell e ajusta a opacidade dos tiles.
+
+3. Carrega o CSV dos Agentes. Campos mínimos:
+
+   * latitude, longitude, nome
+     (auto-deteta variantes: lat, lon/lng, name/displayName, etc.)
+
+4. (Opcional) Carrega o GeoJSON de Energia para ativar a classificação por zonas.
+
+5. Clica Classificar → depois Exportar CSV ou Exportar GeoJSON.
+
 ## Interface
+
 * **Painel superior direito**
 * Mapa de Cobertura: 3G | 4G | 5G
    * Toggle **Unitel / Africell** (tiles nPerf)
@@ -39,5 +55,5 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
 * __Barra nPerf (canto inferior direito)__
    * “Last update — Unitel: …, Africell: …” + legendas 2G/3G/4G/5G
 
-* Legenda (canto inferior esquerdo)
+* __Legenda__ (canto inferior esquerdo)
    * Swatches de cor para camadas Unitel/Africell
