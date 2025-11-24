@@ -2,6 +2,8 @@
 
 Interactive web map to visualize mobile network coverage (Unitel & Africell, via nPerf tiles) and planned Banking Agent locations across Angola.
 
+URL: [Coverage viewer](https://hacktivism-github.github.io/https-hacktivism-github.github.io-banking-agents-connectivity/coverage_viewer.html)
+
 Built with [Leaflet.js](https://leafletjs.com/), the tool allows toggling between operator coverage layers (3G, 4G (LTE) and 5G) and overlaying CSV files with agent coordinates.
 
 ## Features
