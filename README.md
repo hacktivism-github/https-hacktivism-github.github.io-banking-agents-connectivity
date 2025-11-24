@@ -20,17 +20,24 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
 
 ## Interface
 * **Painel superior direito**
+* Mapa de Cobertura: 3G | 4G | 5G
    * Toggle **Unitel / Africell** (tiles nPerf)
    * __Opacidade__ da cobertura
+
+* __Energia (GeoJSON)__
+   * __Carregar GeoJSON, Limpar, Opacidade__
+
+* __.CSV de agentes__
    * __Carregar CSV__ (ou drag-and-drop no mapa)
    * __Limpar pontos__
-
-* __Energia (se ativo no HTML)__
-   * __Carregar GeoJSON, Limpar, Opacidade__
-   * __Classificar__ (A–D)
+     
+* __Classificar zonas__ (A–D)
    * __Mostrar/ocultar__ círculos de zona
-   * __Exportar CSV / GeoJSON__
+
+* __Exportar CSV / GeoJSON__
+
 * __Barra nPerf (canto inferior direito)__
    * “Last update — Unitel: …, Africell: …” + legendas 2G/3G/4G/5G
+
 * Legenda (canto inferior esquerdo)
    * Swatches de cor para camadas Unitel/Africell
