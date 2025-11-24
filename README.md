@@ -50,17 +50,19 @@ unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhen
 **Nota:** como os tiles nPerf são apenas visuais (não “leem píxeis”), para maior rigor defina coverage_best no CSV.
 
 **Exemplo mínimo**
-
+```
 nome,latitude,longitude,coverage_best
 Local A,-8.839,13.234,5G
 Local B,-12.305,19.110,4G
 Local C,-16.730,13.480,3G
+```
 
 ### 2) GeoJSON (Energia)
 
 Usa grid_status nas properties: stable, unstable, offgrid.
 Coordenadas em [lon, lat].
 
+```
 {
   "type": "FeatureCollection",
   "features": [
@@ -76,6 +78,7 @@ Coordenadas em [lon, lat].
     }
   ]
 }
+```
 
 
 ## Interface
