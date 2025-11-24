@@ -13,9 +13,9 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
 * **Carrega um GeoJSON de Energia** (polígonos) para representar a condição da rede elétrica: stable, unstable, offgrid.
 * **Classifica cada agente (A–D)** cruzando coverage e grid status:
   * **A** — energia **stable** + cobertura **4G/5G**
-  * **B / B* ** — energia **stable/unstable/unknown** + cobertura **2G/3G/4G** (**B* ** quando a cobertura está por confirmar/omissa)
+  * __B / B*__ — energia **stable/unstable/unknown** + cobertura **2G/3G/4G** (__B*__ quando a cobertura está por confirmar/omissa)
   * **C** — offgrid (requer VSAT/LEO + solar)
-   * **D** — comunitária/mesh (acesso partilhado / energia híbrida)
+  * **D** — comunitária/mesh (acesso partilhado / energia híbrida)
 * **Exporta resultados para CSV** (limpo, cabeçalhos mínimos) ou **GeoJSON** para relatórios e follow-up.
 
 ## Features
