@@ -80,16 +80,18 @@ Coordenadas em [lon, lat].
 }
 ```
 
-# Como funciona a classificação (A–D)
+## Como funciona a classificação (A–D)
 
 **1. Energia:** teste ponto-no-polígono no GeoJSON de Energia → stable / unstable / offgrid / unknown.
-**2. Cobertura:** normaliza coverage_best (ou deriva de unitel_best/africell_best).
-**3. Regras:**
 
+**2. Cobertura:** normaliza coverage_best (ou deriva de unitel_best/africell_best).
+
+**3. Regras:**
 * offgrid → C
 * stable + (4G ou 5G) → A
 * (stable|unstable|unknown) + (2G|3G|4G) → B
 * Sem cobertura definida → B*
+  
 * __4. Clusters__ herdam a cor da zona predominante dos markers internos.
 
 **Legenda (círculos sobre os pins)**
