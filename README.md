@@ -73,3 +73,13 @@ unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhen
 
 * __Legenda__ (canto inferior esquerdo)
    * Swatches de cor para camadas Unitel/Africell
+ 
+## Limitações
+
+* __Tiles nPerf__ são apenas para visualização; não fazer scraping nem redistribuir dados. Respeitar os termos do nPerf.
+
+* O viewer **não lê píxeis** dos tiles; para rigor por local, usar coverage_best no CSV (ou APIs/relatórios dos operadores).
+
+* Polígonos de energia são **aproximações** salvo se alimentados com dados de rede (subestações, feeders, etc.).
+
+Para problemas de geocodificação no CSV, verificar separador decimal (. vs ,) e nomes de colunas.
