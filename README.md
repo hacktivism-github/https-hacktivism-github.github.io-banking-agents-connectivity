@@ -20,18 +20,34 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
 
 ## Arranque rápido
 
-1. Apontes o seu navegador para [Coverage viewer](https://hacktivism-github.github.io/https-hacktivism-github.github.io-banking-agents-connectivity/coverage_viewer.html)
+**1.** Aponte o seu navegador para [Coverage viewer](https://hacktivism-github.github.io/https-hacktivism-github.github.io-banking-agents-connectivity/coverage_viewer.html)
 
-2. Liga/desliga Unitel / Africell e ajusta a opacidade dos tiles.
+**2.** Ligue/desligue Unitel/Africell e ajuste a opacidade dos tiles.
 
-3. Carrega o CSV dos Agentes. Campos mínimos:
+**3.** Carregue o CSV dos Agentes.
 
+**Campos mínimos:**
    * latitude, longitude, nome
      (auto-deteta variantes: lat, lon/lng, name/displayName, etc.)
 
-4. (Opcional) Carrega o GeoJSON de Energia para ativar a classificação por zonas.
+**5.** (Opcional) Carregue o GeoJSON de Energia para ativar a classificação por zonas.
 
-5. Clica Classificar → depois Exportar CSV ou Exportar GeoJSON.
+**6.** Clique sobre Classificar Zona (A-D) → depois Exportar CSV ou Exportar GeoJSON.
+
+## Dados de entrada
+# 1) CSV (Agentes Bancários)
+
+**Campos mínimos**
+
+   * __latitude, longitude, nome__
+
+**Campos opcionais** (se os tiver)
+
+coverage_best → um de: NONE, 2G, 3G, 4G, 5G
+
+unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhendo o melhor entre unitel_best e africell_best (5G > 4G > 3G > 2G > NONE)
+
+**Nota:** como os tiles nPerf são apenas visuais (não “leem píxeis”), para maior rigor defina coverage_best no CSV.
 
 ## Interface
 
