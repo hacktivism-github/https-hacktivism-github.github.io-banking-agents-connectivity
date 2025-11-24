@@ -30,12 +30,12 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
    * latitude, longitude, nome
      (auto-deteta variantes: lat, lon/lng, name/displayName, etc.)
 
-**5.** (Opcional) Carregue o GeoJSON de Energia para ativar a classificação por zonas.
+**4.** (Opcional) Carregue o GeoJSON de Energia para ativar a classificação por zonas.
 
-**6.** Clique sobre Classificar Zona (A-D) → depois Exportar CSV ou Exportar GeoJSON.
+**5.** Clique sobre Classificar Zona (A-D) → depois Exportar CSV ou Exportar GeoJSON.
 
 ## Dados de entrada
-# 1) CSV (Agentes Bancários)
+### 1) CSV (locais)
 
 **Campos mínimos**
 
@@ -48,6 +48,35 @@ coverage_best → um de: NONE, 2G, 3G, 4G, 5G
 unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhendo o melhor entre unitel_best e africell_best (5G > 4G > 3G > 2G > NONE)
 
 **Nota:** como os tiles nPerf são apenas visuais (não “leem píxeis”), para maior rigor defina coverage_best no CSV.
+
+**Exemplo mínimo**
+
+nome,latitude,longitude,coverage_best
+Local A,-8.839,13.234,5G
+Local B,-12.305,19.110,4G
+Local C,-16.730,13.480,3G
+
+### 2) GeoJSON (Energia)
+
+Usa grid_status nas properties: stable, unstable, offgrid.
+Coordenadas em [lon, lat].
+
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type":"Feature",
+      "properties": { "grid_status":"stable", "name":"Noroeste", "updated_at":"2025-09-17" },
+      "geometry": { "type":"Polygon", "coordinates":[ [[12.0,-7.0],[15.5,-7.0],[15.5,-14.0],[12.0,-14.0],[12.0,-7.0]] ] }
+    },
+    {
+      "type":"Feature",
+      "properties": { "grid_status":"offgrid", "name":"Leste/Sudeste" },
+      "geometry": { "type":"Polygon", "coordinates":[ [[19.5,-8.0],[24.0,-8.0],[24.0,-18.0],[19.5,-18.0],[19.5,-8.0]] ] }
+    }
+  ]
+}
+
 
 ## Interface
 
@@ -83,3 +112,11 @@ unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhen
 * Polígonos de energia são **aproximações** salvo se alimentados com dados de rede (subestações, feeders, etc.).
 
 Para problemas de geocodificação no CSV, verificar separador decimal (. vs ,) e nomes de colunas.
+
+## Créditos & licenças
+
+* Leaflet, Leaflet.markercluster, PapaParse
+* OpenStreetMap (basemap)
+* nPerf (tiles de cobertura) — uso visual apenas; sujeito a termos do nPerf.
+* Projeto para planeamento e reporte interno. Adiciona a tua licença (ex.: MIT) se for para distribuição.
+
