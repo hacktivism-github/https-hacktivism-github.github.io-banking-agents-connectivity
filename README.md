@@ -18,14 +18,19 @@ Criada com [Leaflet.js](https://leafletjs.com/), a ferramenta permite alternar e
   * **D** — comunitária/mesh (acesso partilhado / energia híbrida)
 * **Exporta resultados para CSV** (limpo, cabeçalhos mínimos) ou **GeoJSON** para relatórios e follow-up.
 
-## Features
+## Interface
+* **Painel superior direito**
+   * Toggle **Unitel / Africell** (tiles nPerf)
+   * __Opacidade__ da cobertura
+   * __Carregar CSV__ (ou drag-and-drop no mapa)
+   * __Limpar pontos__
 
-- Toggle Unitel and Africell 3G, 4G(LTE) and 5G coverage layers (nPerf).
-
-- Adjustable coverage opacity for easier visualization.
-
-- Load CSV of Banking Agents (columns: latitude, longitude, nome).
-
-- Works entirely client-side — no server dependency, just open in browser.
-
-- Deployable via GitHub Pages for demos & reports.
+* __Energia (se ativo no HTML)__
+   * __Carregar GeoJSON, Limpar, Opacidade__
+   * __Classificar__ (A–D)
+   * __Mostrar/ocultar__ círculos de zona
+   * __Exportar CSV / GeoJSON__
+* __Barra nPerf (canto inferior direito)__
+   * “Last update — Unitel: …, Africell: …” + legendas 2G/3G/4G/5G
+* Legenda (canto inferior esquerdo)
+   * Swatches de cor para camadas Unitel/Africell
