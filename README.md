@@ -47,7 +47,7 @@ coverage_best → um de: NONE, 2G, 3G, 4G, 5G
 
 unitel_best, africell_best → se coverage_best vier vazio, é derivado escolhendo o melhor entre unitel_best e africell_best (5G > 4G > 3G > 2G > NONE)
 
-**Nota:** como os tiles nPerf são apenas visuais (não “leem píxeis”), para maior rigor defina coverage_best no CSV.
+**Nota:** como os tiles nPerf são apenas visuais (o viewer não “lê píxeis”), para maior rigor defina coverage_best no CSV.
 
 **Exemplo mínimo**
 ```
