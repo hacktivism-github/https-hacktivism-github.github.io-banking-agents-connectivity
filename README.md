@@ -135,8 +135,8 @@ Para problemas de geocodificação no CSV, verificar separador decimal (. vs ,) 
 
 ## Créditos & licenças
 
-* Leaflet, Leaflet.markercluster, PapaParse
-* OpenStreetMap (basemap)
-* nPerf (tiles de cobertura) — uso visual apenas; sujeito a termos do nPerf.
-* Projeto para planeamento e reporte interno. Adiciona a tua licença (ex.: MIT) se for para distribuição.
+* __Leaflet, Leaflet.markercluster, PapaParse__
+* __OpenStreetMap__ (basemap) — manter a atribuição “[© OpenStreetMap contributors](https://www.openstreetmap.org/copyright/en)”
+* __nPerf__ (tiles de cobertura) — uso visual apenas; sujeito a termos do nPerf.
+* __Código-fonte:__ MIT - ver [LICENSE]([https://leafletjs.com/](https://github.com/hacktivism-github/https-hacktivism-github.github.io-banking-agents-connectivity/blob/main/LICENSE).
 
