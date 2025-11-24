@@ -92,7 +92,7 @@ Coordenadas em [lon, lat].
 * (stable|unstable|unknown) + (2G|3G|4G) → B
 * Sem cobertura definida → B*
   
-* __4. Clusters__ herdam a cor da zona predominante dos markers internos.
+**4. Clusters** herdam a cor da zona predominante dos markers internos.
 
 **Legenda (círculos sobre os pins)**
 🔴 __C__ | 🟡 __B__/__B*__ | 🟢 __A__ | 🔵 __D__
